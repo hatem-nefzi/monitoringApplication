@@ -1,15 +1,18 @@
 package com.example.demo.config;
 
+import io.kubernetes.client.openapi.ApiClient;
+import io.kubernetes.client.util.Config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import io.fabric8.kubernetes.client.KubernetesClient;
-import io.fabric8.kubernetes.client.KubernetesClientBuilder;
+import java.io.IOException;
 
 @Configuration
 public class KubernetesConfig {
+
     @Bean
-    public KubernetesClient kubernetesClient() {
-        return new KubernetesClientBuilder().build(); // Uses default kubeconfig
+    public ApiClient apiClient() throws IOException {
+        // Automatically detects kubeconfig in standard locations
+        return Config.defaultClient();
     }
 }

@@ -1,28 +1,16 @@
 package com.example.demo.model;
 
+import lombok.Data;
 
+@Data
 public class PodInfo {
     private String name;
+    private String namespace;
     private String status;
 
-    public PodInfo(String name, String status) {
+    public PodInfo(String name, String namespace, String status) {
         this.name = name;
-        this.status = status;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
+        this.namespace = namespace;
         this.status = status;
     }
 }

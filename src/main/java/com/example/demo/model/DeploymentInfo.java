@@ -1,27 +1,26 @@
 package com.example.demo.model;
 
+
+
+
+import io.kubernetes.client.openapi.models.V1Deployment;
+import lombok.Data;
+
+import java.util.Map;
+
+@Data
 public class DeploymentInfo {
     private String name;
-    private Integer replicas;
+    private String namespace;
+    private int replicas;
+    private int availableReplicas;
+    private Map<String, String> labels;
 
-    public DeploymentInfo(String name, Integer replicas) {
-        this.name = name;
-        this.replicas = replicas;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public Integer getReplicas() {
-        return replicas;
-    }
-
-    public void setReplicas(Integer replicas) {
-        this.replicas = replicas;
+    public DeploymentInfo(V1Deployment deployment) {
+        this.name = deployment.getMetadata().getName();
+        this.namespace = deployment.getMetadata().getNamespace();
+        this.replicas = deployment.getSpec().getReplicas();
+        this.availableReplicas = deployment.getStatus().getAvailableReplicas();
+        this.labels = deployment.getMetadata().getLabels();
     }
 }

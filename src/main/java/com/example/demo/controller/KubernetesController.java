@@ -1,30 +1,47 @@
 package com.example.demo.controller;
 
-import java.util.List;
+import com.example.demo.service.KubernetesService;
 
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.demo.model.PodInfo;
-import com.example.demo.service.KubernetesService;
-
 @RestController
 @RequestMapping("/api/kubernetes")
 public class KubernetesController {
-    private final KubernetesService kubernetesService;
 
-    public KubernetesController(KubernetesService kubernetesService) {
-        this.kubernetesService = kubernetesService;
-    }
+    @Autowired
+    private KubernetesService kubernetesService;
 
-    @GetMapping("/pods")
-    public List<PodInfo> getPods() {
-        return kubernetesService.getPods();
+    @GetMapping("/pod-names")
+public Map<String, Object> getPodNames() {
+    try {
+        return Map.of(
+            "success", true,
+            "podNames", kubernetesService.getPodNames()
+        );
+    } catch (Exception e) {
+        return Map.of(
+            "success", false,
+            "error", e.getMessage()
+        );
     }
-
-    @GetMapping("/deployments")
-    public List<DeploymentInfo> getDeployments() {
-        return kubernetesService.getDeployments();
+}
+@GetMapping("/pods")
+public Map<String, Object> getPods() {
+    try {
+        return Map.of(
+            "success", true,
+            "pods", kubernetesService.getPodInfo(null)
+        );
+    } catch (Exception e) {
+        return Map.of(
+            "success", false,
+            "error", e.getMessage()
+        );
     }
+}
 }
