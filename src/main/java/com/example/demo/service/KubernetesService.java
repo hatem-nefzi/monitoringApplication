@@ -23,11 +23,13 @@ public class KubernetesService {
     private static final Logger logger = LoggerFactory.getLogger(KubernetesService.class);
 
     private final CoreV1Api coreV1Api;
+    private final PodMetricsService metricsService;
 
     @Autowired
-    public KubernetesService(ApiClient apiClient) {
+    public KubernetesService(ApiClient apiClient, PodMetricsService metricsService) {
         this.coreV1Api = new CoreV1Api(apiClient);
-        logger.info("KubernetesService initialized with CoreV1Api");
+        this.metricsService = metricsService;
+        logger.info("KubernetesService initialized with CoreV1Api and PodMetricsService");
     }
 
     public List<String> getPodNames() throws ApiException {
@@ -74,16 +76,23 @@ public class KubernetesService {
             .map(status -> createContainerInfo(status, containerSpecs.get(status.getName())))
             .collect(Collectors.toList());
 
+        // Get pod metrics
+        Map<String, String> metrics = metricsService.getPodMetrics(
+            pod.getMetadata().getNamespace(),
+            pod.getMetadata().getName()
+        );
+
         PodInfo podInfo = new PodInfo(
             pod.getMetadata().getName(),
             pod.getMetadata().getNamespace(),
             pod.getStatus().getPhase(),
             pod.getSpec().getNodeName(),
             pod.getStatus().getHostIP(),
-            containers
+            containers,
+            metrics
         );
 
-        logger.trace("Processed pod: {}", podInfo);
+        logger.trace("Processed pod with metrics: {}", podInfo);
         return podInfo;
     }
 
