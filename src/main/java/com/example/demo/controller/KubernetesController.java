@@ -77,4 +77,20 @@ public class KubernetesController {
                 500
             ));
     }
+    @GetMapping("/namespaces")
+public ResponseEntity<Map<String, Object>> getNamespaces() {
+    try {
+        List<String> namespaces = kubernetesService.getNamespaces();
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "namespaces", namespaces
+        ));
+    } catch (Exception e) {
+        return ResponseEntity.status(500)
+            .body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+    }
+}
 }

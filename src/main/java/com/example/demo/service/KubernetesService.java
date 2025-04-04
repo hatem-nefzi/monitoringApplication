@@ -116,4 +116,12 @@ public class KubernetesService {
             state
         );
     }
+
+    public List<String> getNamespaces() throws ApiException {
+        return coreV1Api.listNamespace(null, null, null, null, null, null, null, null, null, null)
+            .getItems()
+            .stream()
+            .map(ns -> ns.getMetadata().getName())
+            .collect(Collectors.toList());
+    }
 }
