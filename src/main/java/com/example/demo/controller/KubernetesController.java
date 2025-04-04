@@ -15,6 +15,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/kubernetes")
+@CrossOrigin(origins = "http://localhost:4200")
 public class KubernetesController {
     private static final Logger logger = LoggerFactory.getLogger(KubernetesController.class);
 
