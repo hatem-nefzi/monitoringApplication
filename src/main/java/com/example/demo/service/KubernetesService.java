@@ -7,12 +7,17 @@ import io.kubernetes.client.openapi.models.V1Container;
 import io.kubernetes.client.openapi.models.V1ContainerStatus;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1PodList;
+
+
 import com.example.demo.model.ContainerInfo;
 import com.example.demo.model.PodInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+
 
 import java.util.List;
 import java.util.Map;
@@ -123,5 +128,57 @@ public class KubernetesService {
             .stream()
             .map(ns -> ns.getMetadata().getName())
             .collect(Collectors.toList());
+    }
+
+    //methods for view logs and inspect 
+    public ResponseEntity<String> getPodLogs(
+        String namespace,
+        String podName,
+        String container,
+        int tailLines) {
+    
+    try {
+        String logs = coreV1Api.readNamespacedPodLog(
+            podName,                     // String name
+            namespace,                   // String namespace
+            container,                   // String container (optional)
+            false,                       // Boolean follow
+            false,                       // Boolean insecureSkipTLSVerifyBackend
+            null,                        // Integer limitBytes
+            null,                        // String pretty
+            false,                       // Boolean previous
+            null,                        // Integer sinceSeconds
+            tailLines,                   // Integer tailLines
+            false                        // Boolean timestamps
+        );
+        
+        return ResponseEntity.ok(logs);
+    } catch (ApiException e) {
+        logger.error("Failed to get logs for pod {}/{}: {}", namespace, podName, e.getResponseBody(), e);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body("Error fetching logs: " + e.getResponseBody());
+    }
+}
+    public ResponseEntity<Object> getPodDetails(
+            String namespace,
+            String podName) {
+        
+        try {
+            V1Pod pod = coreV1Api.readNamespacedPod(
+                podName,
+                namespace,
+                null  // pretty
+            );
+            
+            if (pod == null) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            return ResponseEntity.ok(pod);
+        } catch (ApiException e) {
+            logger.error("Failed to get details for pod {}/{}: {}", namespace, podName, e.getResponseBody(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Error fetching pod details: " + e.getResponseBody()));
+        }
     }
 }

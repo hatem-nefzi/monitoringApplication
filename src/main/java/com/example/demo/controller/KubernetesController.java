@@ -93,4 +93,19 @@ public ResponseEntity<Map<String, Object>> getNamespaces() {
             ));
     }
 }
+@GetMapping("/namespaces/{namespace}/pods/{podName}/logs")
+public ResponseEntity<String> getPodLogs(
+        @PathVariable String namespace,
+        @PathVariable String podName,
+        @RequestParam(required = false) String container,
+        @RequestParam(required = false, defaultValue = "100") int tailLines) {
+    return kubernetesService.getPodLogs(namespace, podName, container, tailLines);
+}
+
+@GetMapping("/namespaces/{namespace}/pods/{podName}")
+public ResponseEntity<Object> getPodDetails(
+        @PathVariable String namespace,
+        @PathVariable String podName) {
+    return kubernetesService.getPodDetails(namespace, podName);
+}
 }
