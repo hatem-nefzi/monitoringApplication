@@ -1,7 +1,10 @@
 package com.example.demo.controller;
 
+import com.example.demo.model.DeploymentInfo;
 import com.example.demo.model.ErrorResponse;
+import com.example.demo.model.IngressInfo;
 import com.example.demo.model.PodInfo;
+import com.example.demo.model.ServiceInfo;
 import com.example.demo.service.KubernetesService;
 import io.kubernetes.client.openapi.ApiException;
 import org.slf4j.Logger;
@@ -108,4 +111,40 @@ public ResponseEntity<Object> getPodDetails(
         @PathVariable String podName) {
     return kubernetesService.getPodDetails(namespace, podName);
 }
+
+
+
+//for deployments , services, and ingress
+ @GetMapping("/deployments")
+    public ResponseEntity<?> getDeployments(@RequestParam(required = false) String namespace) {
+        try {
+            List<DeploymentInfo> deployments = kubernetesService.getDeployments(namespace);
+            return ResponseEntity.ok(Map.of("success", true, "deployments", deployments));
+        } catch (ApiException e) {
+            return ResponseEntity.status(e.getCode())
+                .body(Map.of("success", false, "error", e.getResponseBody()));
+        }
+    }
+
+    @GetMapping("/services")
+    public ResponseEntity<?> getServices(@RequestParam(required = false) String namespace) {
+        try {
+            List<ServiceInfo> services = kubernetesService.getServices(namespace);
+            return ResponseEntity.ok(Map.of("success", true, "services", services));
+        } catch (ApiException e) {
+            return ResponseEntity.status(e.getCode())
+                .body(Map.of("success", false, "error", e.getResponseBody()));
+        }
+    }
+
+    @GetMapping("/ingresses")
+    public ResponseEntity<?> getIngresses(@RequestParam(required = false) String namespace) {
+        try {
+            List<IngressInfo> ingresses = kubernetesService.getIngresses(namespace);
+            return ResponseEntity.ok(Map.of("success", true, "ingresses", ingresses));
+        } catch (ApiException e) {
+            return ResponseEntity.status(e.getCode())
+                .body(Map.of("success", false, "error", e.getResponseBody()));
+        }
+    }
 }
