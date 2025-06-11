@@ -12,8 +12,6 @@ public class IngressInfo {
     private String creationTimestamp;
     private List<String> hosts;
     private List<String> paths;
-
-    public IngressInfo() {}
     
-    // You can add a constructor that takes V1Ingress if needed
+    // No need for an explicit constructor unless you're doing something custom
 }
