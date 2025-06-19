@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+  <suppress>
+    <notes><![CDATA[False positive on Spring Framework]]></notes>
+    <packageUrl regex="true">^pkg:maven/org\.springframework\.boot/spring-boot-actuator-autoconfigure@.*$</packageUrl>
+    <vulnerabilityName>CVE-2025-22235</vulnerabilityName>
+  </suppress>
+</suppressions>
