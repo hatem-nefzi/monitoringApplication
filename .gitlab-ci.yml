@@ -177,6 +177,7 @@ owasp_dependency_check:
         -DoutputDirectory=./target \
         -DsuppressionFile=.gitlab/dependency-check-suppressions.xml \
         -DdataDirectory=.cache/dependency-check \
+        -Dnvd.api.key=${NVD_API_KEY} \
         -DfailBuildOnCVSS=${FAIL_ON_CVSS}
     - ls -la target/ | grep dependency-check
   artifacts:
