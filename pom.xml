@@ -108,7 +108,7 @@
                 <groupId>com.google.protobuf</groupId>
                 <artifactId>protobuf-java</artifactId>
                 <version>3.25.5</version> <!-- LTS version -->
-            dependency>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
