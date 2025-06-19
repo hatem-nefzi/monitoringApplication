@@ -6,6 +6,11 @@ stages:
   - sonarqube
   - docker
   - docker_security
+  - deploy-staging
+  - staging-tests
+  - deploy-production
+  - monitoring-verify
+  - deploy-gke
 
 
 
@@ -61,12 +66,16 @@ variables:
   GCP_PROJECT_ID: "decent-vertex-459014-k2"
   GKE_CLUSTER_NAME: "my-pfe-cluster"
   GKE_ZONE: "europe-west1-b"
-  GKE_NAMESPACE: "gke-production"
+  GKE_NAMESPACE: "monitoring-backend"
   GKE_REPLICAS: 2
   GKE_MEMORY_REQUEST: "256Mi"
   GKE_MEMORY_LIMIT: "512Mi"
   GKE_CPU_REQUEST: "100m"
   GKE_CPU_LIMIT: "200m"
+
+   # Application Configuration
+  APP_NAME: "monitoring-backend"
+  APP_PORT: "9090"
 
 
 
@@ -94,6 +103,18 @@ variables:
     KUBECONFIG: /tmp/kubeconfig/config
 
 
+# Template for production jobs (runs on VM2 - K3s)
+.production_job: &production_job_definition
+  tags:
+    - production  # New runner tag
+    - gitlab-runner-prod
+    - kubernetes
+    - minikube
+    - registry
+  variables:
+    TARGET_ENV: "production"
+    REGISTRY_URL: "$PRODUCTION_REGISTRY_URL"
+    KUBE_SERVER: "https://$PRODUCTION_VM_IP:6443"  # K3s uses HTTPS and port 6443
 
 
 checkout:
@@ -130,8 +151,8 @@ sonarqube_scan:
   script:
     - >
       mvn sonar:sonar
-      -Dsonar.projectKey=ops-cloud
-      -Dsonar.projectName=ops-cloud
+      -Dsonar.projectKey=monitoring-backend
+      -Dsonar.projectName=monitoring-backend
       -Dsonar.host.url=${SONAR_HOST_URL}
       -Dsonar.token=${SONAR_TOKEN}
       -Dsonar.java.binaries=target/classes
@@ -221,5 +242,139 @@ container_scan:
     when: always
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
+
+
+
+# Staging Deployment
+deploy_staging:
+  <<: *deploy_environment
+  stage: deploy-staging
+  variables:
+    ENVIRONMENT: staging
+    REPLICAS: $STAGING_REPLICAS
+    MEMORY_REQUEST: $STAGING_RESOURCES_MEMORY_REQUEST
+    MEMORY_LIMIT: $STAGING_RESOURCES_MEMORY_LIMIT
+    CPU_REQUEST: $STAGING_CPU_REQUEST
+    CPU_LIMIT: $STAGING_CPU_LIMIT
+  script:
+    - kubectl cluster-info
+
+    # Create Docker Hub registry secret for Kubernetes
+    - |
+      echo "Creating docker-registry secret for ${ENVIRONMENT}..."
+      kubectl delete secret docker-hub-secret -n ${ENVIRONMENT} --ignore-not-found=true
+      kubectl create secret docker-registry docker-hub-secret \
+        --docker-server=$DOCKER_HUB_REGISTRY \
+        --docker-username=$DOCKER_HUB_USERNAME \
+        --docker-password=$DOCKER_HUB_PASSWORD \
+        -n ${ENVIRONMENT} \
+        --dry-run=client -o yaml | kubectl apply -f -
+
+    # Create environment-specific deployment manifest
+    - |
+      echo "Creating ${ENVIRONMENT} deployment manifest..."
+      cat > k8s-deployment-${ENVIRONMENT}.yaml << EOF
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: ${APP_NAME}-deployment-${ENVIRONMENT}
+        namespace: ${ENVIRONMENT}
+        labels:
+          app: ${APP_NAME}
+          environment: ${ENVIRONMENT}
+      spec:
+        replicas: ${REPLICAS}
+        selector:
+          matchLabels:
+            app: ${APP_NAME}
+            environment: ${ENVIRONMENT}
+        template:
+          metadata:
+            labels:
+              app: ${APP_NAME}
+              environment: ${ENVIRONMENT}
+          spec:
+            imagePullSecrets:
+              - name: docker-hub-secret
+            containers:
+            - name: ${APP_NAME}
+              image: ${DOCKER_HUB_IMAGE}:${CI_COMMIT_SHORT_SHA}
+              imagePullPolicy: Always
+              ports:
+              - containerPort: ${APP_PORT}
+              env:
+              - name: SPRING_PROFILES_ACTIVE
+                value: "kubernetes,${ENVIRONMENT}"
+              - name: ENVIRONMENT
+                value: "${ENVIRONMENT}"
+              livenessProbe:
+                httpGet:
+                  path: /actuator/health/liveness
+                  port: ${APP_PORT}
+                initialDelaySeconds: 60
+                periodSeconds: 10
+                failureThreshold: 3
+              readinessProbe:
+                httpGet:
+                  path: /actuator/health/readiness
+                  port: ${APP_PORT}
+                initialDelaySeconds: 30
+                periodSeconds: 5
+                failureThreshold: 3
+              resources:
+                requests:
+                  memory: "${MEMORY_REQUEST}"
+                  cpu: "${CPU_REQUEST}"
+                limits:
+                  memory: "${MEMORY_LIMIT}"
+                  cpu: "${CPU_LIMIT}"
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: ${APP_NAME}-service-${ENVIRONMENT}
+        namespace: ${ENVIRONMENT}
+        labels:
+          app: ${APP_NAME}
+          environment: ${ENVIRONMENT}
+      spec:
+        selector:
+          app: ${APP_NAME}
+          environment: ${ENVIRONMENT}
+        ports:
+        - port: 80
+          targetPort: ${APP_PORT}
+          protocol: TCP
+        type: ClusterIP
+      EOF
+
+      echo "${ENVIRONMENT} deployment manifest:"
+      cat k8s-deployment-${ENVIRONMENT}.yaml
+
+    # Apply the deployment
+    - kubectl delete deployment ${APP_NAME}-deployment-${ENVIRONMENT} -n ${ENVIRONMENT} --ignore-not-found=true
+    - kubectl apply -f k8s-deployment-${ENVIRONMENT}.yaml
+
+    # Wait for deployment to complete
+    - echo "Waiting for ${ENVIRONMENT} deployment to complete..."
+    - kubectl rollout status deployment/${APP_NAME}-deployment-${ENVIRONMENT} -n ${ENVIRONMENT} --timeout=300s
+
+    # Show status
+    - |
+      echo "=== ${ENVIRONMENT} DEPLOYMENT STATUS ==="
+      kubectl get deployments -n ${ENVIRONMENT}
+      kubectl get pods -l app=${APP_NAME},environment=${ENVIRONMENT} -n ${ENVIRONMENT}
+      kubectl get services -n ${ENVIRONMENT}
+
+      echo "=== POD DETAILS ==="
+      kubectl describe pods -l app=${APP_NAME},environment=${ENVIRONMENT} -n ${ENVIRONMENT}
+
+  rules:
+    - if: $CI_COMMIT_BRANCH == "experiment" || $CI_COMMIT_BRANCH == "develop"
+
+
+
+
+
 
 
