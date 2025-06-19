@@ -172,9 +172,9 @@ owasp_dependency_check:
     - if [ -f package.json ]; then npm install --package-lock-only; fi
   script:
     - |
-      mvn org.owasp:dependency-check-maven:8.4.2:check \
+      mvn org.owasp:dependency-check-maven:12.1.0:check \
         -Dformat=ALL \
-        -DoutputDirectory=./reports/dependency-check \
+        -DoutputDirectory=./target \
         -DsuppressionFile=.gitlab/dependency-check-suppressions.xml \
         -DdataDirectory=.cache/dependency-check \
         -DfailBuildOnCVSS=${FAIL_ON_CVSS}
