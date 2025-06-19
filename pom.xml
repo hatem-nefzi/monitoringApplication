@@ -22,7 +22,7 @@
         <kubernetes-client.version>18.0.0</kubernetes-client.version>
         <!-- Force newer versions to address security vulnerabilities -->
         <snakeyaml.version>2.0</snakeyaml.version>
-        <tomcat.version>10.1.40</tomcat.version>
+        <tomcat.version>10.1.42</tomcat.version>
     </properties>
 
     <dependencies>
@@ -70,6 +70,11 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.14.0</version>
+        </dependency>
     </dependencies>
 
     <!-- Dependency Management to override vulnerable versions -->
@@ -98,6 +103,12 @@
                 <artifactId>tomcat-embed-el</artifactId>
                 <version>${tomcat.version}</version>
             </dependency>
+            <!--added to solve container scan issues -->
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java</artifactId>
+                <version>3.25.5</version> <!-- LTS version -->
+            dependency>
         </dependencies>
     </dependencyManagement>
 
