@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.1.0</version>
+        <version>3.3.12</version> <!-- Updated to latest 3.3.x version -->
         <relativePath/>
     </parent>
 
@@ -20,9 +20,13 @@
     <properties>
         <java.version>17</java.version>
         <kubernetes-client.version>18.0.0</kubernetes-client.version>
+        <!-- Force newer versions to address security vulnerabilities -->
+        <snakeyaml.version>2.0</snakeyaml.version>
+        <tomcat.version>10.1.33</tomcat.version>
     </properties>
 
     <dependencies>
+        
         <!-- Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -32,12 +36,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>1.18.38</version> <!-- Use the latest version -->
-            <scope>provided</scope>
-        </dependency>
         
         <!-- Kubernetes Client -->
         <dependency>
@@ -46,12 +44,12 @@
             <version>${kubernetes-client.version}</version>
             <scope>compile</scope>
         </dependency>
-        <!--metrics API Dependency-->
-        <!-- Replace the metrics dependency with this -->
+        
+        <!-- Metrics API Dependencies -->
         <dependency>
             <groupId>io.kubernetes</groupId>
             <artifactId>client-java-api</artifactId>
-            <version>18.0.0</version> <!-- Match your existing version -->
+            <version>18.0.0</version>
         </dependency>
         <dependency>
             <groupId>io.kubernetes</groupId>
@@ -74,28 +72,68 @@
         </dependency>
     </dependencies>
 
+    <!-- Dependency Management to override vulnerable versions -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- Override SnakeYAML to fix CVE-2022-1471 -->
+            <dependency>
+                <groupId>org.yaml</groupId>
+                <artifactId>snakeyaml</artifactId>
+                <version>${snakeyaml.version}</version>
+            </dependency>
+            
+            <!-- Override Tomcat versions to fix multiple CVEs -->
+            <dependency>
+                <groupId>org.apache.tomcat.embed</groupId>
+                <artifactId>tomcat-embed-core</artifactId>
+                <version>${tomcat.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tomcat.embed</groupId>
+                <artifactId>tomcat-embed-websocket</artifactId>
+                <version>${tomcat.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tomcat.embed</groupId>
+                <artifactId>tomcat-embed-el</artifactId>
+                <version>${tomcat.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <build>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
             </plugin>
+            
+            <!-- SonarQube Plugin -->
             <plugin>
                 <groupId>org.sonarsource.scanner.maven</groupId>
                 <artifactId>sonar-maven-plugin</artifactId>
-                <version>3.9.1.2184</version> <!-- or latest -->
+                <version>4.0.0.4121</version>
             </plugin>
+            
+            <!-- OWASP Dependency Check Plugin -->
             <plugin>
                 <groupId>org.owasp</groupId>
                 <artifactId>dependency-check-maven</artifactId>
-                <version>8.4.0</version> <!-- or latest -->
+                <version>12.1.0</version>
                 <configuration>
                     <format>ALL</format>
                     <failBuildOnCVSS>9</failBuildOnCVSS>
+                    <suppressionFile>.gitlab/dependency-check-suppressions.xml</suppressionFile>
                 </configuration>
             </plugin>
-
-
         </plugins>
     </build>
 </project>
