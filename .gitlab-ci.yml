@@ -2,9 +2,10 @@ stages:
   - checkout
   - build
   - test 
+  - security
   - sonarqube
   - docker
-  - security
+  - docker_security
 
 
 
@@ -120,6 +121,57 @@ build:
     paths:
       - target/
 
+sonarqube_scan:
+  <<: *maven_definition
+  stage: sonarqube
+  needs: ["build"]
+  variables:
+    SONAR_SCANNER_OPTS: "-Xmx1024m"
+  script:
+    - >
+      mvn sonar:sonar
+      -Dsonar.projectKey=ops-cloud
+      -Dsonar.projectName=ops-cloud
+      -Dsonar.host.url=${SONAR_HOST_URL}
+      -Dsonar.token=${SONAR_TOKEN}
+      -Dsonar.java.binaries=target/classes
+      -Dsonar.sourceEncoding=UTF-8
+      -Dsonar.sources=src/main/java
+      -Dsonar.tests=src/test/java
+      -Dsonar.junit.reportPaths=target/surefire-reports
+
+owasp_dependency_check:
+  <<: *maven_definition
+  stage: security
+  needs: ["build"]
+  variables:
+    FAIL_ON_CVSS: 9 # Only fail on critical vulnerabilities
+  before_script:
+    - mkdir -p .cache/dependency-check
+    - if [ -f package.json ]; then npm install --package-lock-only; fi
+  script:
+    - |
+      mvn org.owasp:dependency-check-maven:check \
+        -Dformat=ALL \
+        -DoutputDirectory=./reports/dependency-check \
+        -DsuppressionFile=.gitlab/dependency-check-suppressions.xml \
+        -DdataDirectory=.cache/dependency-check \
+        -DfailBuildOnCVSS=${FAIL_ON_CVSS}
+    - ls -la target/ | grep dependency-check
+  artifacts:
+    paths:
+      - target/dependency-check-report.*
+    reports:
+      dependency_scanning: target/dependency-check-report.json
+    expire_in: 1 week
+  cache:
+    key: "dependency-check-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .cache/dependency-check/
+    policy: pull-push
+  rules:
+    - if: $CI_COMMIT_BRANCH == "experiment"
+
 
 
 
@@ -149,6 +201,24 @@ docker_publish:
     - echo "Pushing versioned and latest tags..."
     - docker push "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
     - docker push "$CI_REGISTRY_IMAGE:latest"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "experiment"
+
+
+container_scan:
+  <<: *job_definition
+  stage: docker_security
+  image: 
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  needs: ["docker_publish"]
+  script:
+    - echo "Scanning image $VERSIONED_IMAGE"
+    - trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --insecure --output gl-container-scanning-report.json "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" # change exit code to 1 for production to failt the ci when we find high risk vulnerability
+  artifacts:
+    reports:
+      container_scanning: gl-container-scanning-report.json
+    when: always
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
 
