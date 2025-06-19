@@ -22,7 +22,7 @@
         <kubernetes-client.version>18.0.0</kubernetes-client.version>
         <!-- Force newer versions to address security vulnerabilities -->
         <snakeyaml.version>2.0</snakeyaml.version>
-        <tomcat.version>10.1.35</tomcat.version>
+        <tomcat.version>10.1.40</tomcat.version>
     </properties>
 
     <dependencies>
