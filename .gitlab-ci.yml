@@ -306,7 +306,6 @@ docker_publish:
 
 
 
-
 deploy_monitoring_backend_staging:
   <<: *monitoring_staging_deploy
   stage: deploy-staging
@@ -317,45 +316,49 @@ deploy_monitoring_backend_staging:
     # Create namespace
     - kubectl create namespace ${ENVIRONMENT} --dry-run=client -o yaml | kubectl apply -f -
     
-    # Debug paths
-    - pwd
+    # Debug paths and store the project root
+    - PROJECT_ROOT=$(pwd)
+    - echo "Project root: $PROJECT_ROOT"
     - ls -la k8s/overlays/staging/
     - ls -la k8s/overlays/staging/../../base/
     
-    # Update kustomization
+    # Clean up existing ConfigMap first
+    - kubectl delete configmap monitoring-backend-config -n ${ENVIRONMENT} --ignore-not-found=true
+    
+    # Update kustomization in staging overlay
     - |
       echo "Updating image tag in staging kustomization..."
-      cd k8s/overlays/staging
+      cd $PROJECT_ROOT/k8s/overlays/staging
       
       # Fix deprecated fields
       kustomize edit fix
       
-      # Set absolute path for base
-      BASE_PATH=$(realpath ../../base)
-      kustomize edit set resource "$BASE_PATH"
-      
-      # Update image
+      # Update image with the correct registry and tag
       kustomize edit set image monitoring-backend=${MONITORING_BACKEND_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
       
-      # Change ConfigMap behavior to replace
-      yq eval -i '.configMapGenerator[0].behavior = "replace"' kustomization.yaml
+      # Ensure ConfigMap behavior is set to replace
+      if grep -q "behavior:" kustomization.yaml; then
+        sed -i 's/behavior:.*/behavior: replace/' kustomization.yaml
+      else
+        # Add behavior field if it doesn't exist
+        sed -i '/configMapGenerator:/,/name: monitoring-backend-config/ s/name: monitoring-backend-config/behavior: replace\n    name: monitoring-backend-config/' kustomization.yaml
+      fi
       
+      echo "Updated kustomization.yaml:"
       cat kustomization.yaml
     
-    # Clean up existing ConfigMap
-    - kubectl delete configmap monitoring-backend-config -n ${ENVIRONMENT} --ignore-not-found=true
-    
-    # Generate manifests
+    # Generate and show manifests
     - |
-      echo "=== GENERATED MANIFESTS FOR STAGING ==="
-      cd k8s/overlays/staging
-      kustomize build . > ../../../monitoring-backend-staging-manifests.yaml
-      cat ../../../monitoring-backend-staging-manifests.yaml
+      echo "=== GENERATING MANIFESTS FOR STAGING ==="
+      cd $PROJECT_ROOT/k8s/overlays/staging
+      kustomize build . > $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
+      echo "Generated manifests:"
+      cat $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
     
     # Apply manifests
     - |
       echo "Applying monitoring backend to staging..."
-      cd k8s/overlays/staging
+      cd $PROJECT_ROOT/k8s/overlays/staging
       kubectl apply -k .
     
     # Wait for deployment
@@ -366,6 +369,7 @@ deploy_monitoring_backend_staging:
     # Apply ingress
     - |
       echo "Applying ingress for staging..."
+      cd $PROJECT_ROOT
       kubectl apply -f k8s/ingress/staging-ingress.yaml
     
     # Show status
@@ -379,6 +383,5 @@ deploy_monitoring_backend_staging:
       - monitoring-backend-staging-manifests.yaml
     expire_in: 1 week
     when: always
-
 
 
