@@ -92,33 +92,37 @@ public class KubernetesService {
     }
 
     private PodInfo mapPodToPodInfo(V1Pod pod) {
-        // Create mapping of container names to their specs
-        Map<String, V1Container> containerSpecs = pod.getSpec().getContainers().stream()
-            .collect(Collectors.toMap(V1Container::getName, container -> container));
+    // Create mapping of container names to their specs
+    Map<String, V1Container> containerSpecs = pod.getSpec().getContainers().stream()
+        .collect(Collectors.toMap(V1Container::getName, container -> container));
 
-        // Process container statuses
-        List<ContainerInfo> containers = pod.getStatus().getContainerStatuses().stream()
+    // ✅ Fix: safely handle null containerStatuses
+    List<ContainerInfo> containers = new ArrayList<>();
+    if (pod.getStatus().getContainerStatuses() != null) {
+        containers = pod.getStatus().getContainerStatuses().stream()
             .map(status -> createContainerInfo(status, containerSpecs.get(status.getName())))
             .collect(Collectors.toList());
+    }
 
-        // Get pod metrics
-        Map<String, String> metrics = metricsService.getPodMetrics(
-            pod.getMetadata().getNamespace(),
-            pod.getMetadata().getName()
-        );
+    // Get pod metrics
+    Map<String, String> metrics = metricsService.getPodMetrics(
+        pod.getMetadata().getNamespace(),
+        pod.getMetadata().getName()
+    );
 
-        PodInfo podInfo = new PodInfo(
-            pod.getMetadata().getName(),
-            pod.getMetadata().getNamespace(),
-            pod.getStatus().getPhase(),
-            pod.getSpec().getNodeName(),
-            pod.getStatus().getHostIP(),
-            containers,
-            metrics
-        );
+    return new PodInfo(
+        pod.getMetadata().getName(),
+        pod.getMetadata().getNamespace(),
+        pod.getStatus().getPhase(),
+        pod.getSpec().getNodeName(),
+        pod.getStatus().getHostIP(),
+        containers,
+        metrics
+    );
 
-        logger.trace("Processed pod with metrics: {}", podInfo);
-        return podInfo;
+
+
+        
     }
 
     private ContainerInfo createContainerInfo(V1ContainerStatus status, V1Container spec) {
