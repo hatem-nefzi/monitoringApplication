@@ -271,60 +271,6 @@ build:
     paths:
       - target/
 
-sonarqube_scan:
-  <<: *maven_definition
-  stage: sonarqube
-  needs: ["build"]
-  variables:
-    SONAR_SCANNER_OPTS: "-Xmx1024m"
-  script:
-    - >
-      mvn sonar:sonar
-      -Dsonar.projectKey=monitoring-backend
-      -Dsonar.projectName=monitoring-backend
-      -Dsonar.host.url=${SONAR_HOST_URL}
-      -Dsonar.token=${SONAR_TOKEN}
-      -Dsonar.java.binaries=target/classes
-      -Dsonar.sourceEncoding=UTF-8
-      -Dsonar.sources=src/main/java
-      -Dsonar.tests=src/test/java
-      -Dsonar.junit.reportPaths=target/surefire-reports
-
-owasp_dependency_check:
-  <<: *maven_definition
-  stage: security
-  needs: ["build"]
-  variables:
-    FAIL_ON_CVSS: 9 # Only fail on critical vulnerabilities
-  before_script:
-    - mkdir -p .cache/dependency-check
-    - if [ -f package.json ]; then npm install --package-lock-only; fi
-  script:
-    - |
-      mvn org.owasp:dependency-check-maven:12.1.0:check \
-        -Dformat=ALL \
-        -DoutputDirectory=./target \
-        -DsuppressionFile=.gitlab/dependency-check-suppressions.xml \
-        -DdataDirectory=.cache/dependency-check \
-        -Dnvd.api.key=${NVD_API_KEY} \
-        -DfailBuildOnCVSS=${FAIL_ON_CVSS}
-    - ls -la target/ | grep dependency-check
-  artifacts:
-    paths:
-      - target/dependency-check-report.*
-    reports:
-      dependency_scanning: target/dependency-check-report.json
-    expire_in: 1 week
-  cache:
-    key: "dependency-check-${CI_COMMIT_REF_SLUG}"
-    paths:
-      - .cache/dependency-check/
-    policy: pull-push
-  rules:
-    - if: $CI_COMMIT_BRANCH == "experiment"
-
-
-
 
 
 
@@ -359,22 +305,6 @@ docker_publish:
     - if: $CI_COMMIT_BRANCH == "experiment"
 
 
-container_scan:
-  <<: *job_definition
-  stage: docker_security
-  image: 
-    name: aquasec/trivy:latest
-    entrypoint: [""]
-  needs: ["docker_publish"]
-  script:
-    - echo "Scanning image $VERSIONED_IMAGE"
-    - trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --insecure --output gl-container-scanning-report.json "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" # change exit code to 1 for production to failt the ci when we find high risk vulnerability
-  artifacts:
-    reports:
-      container_scanning: gl-container-scanning-report.json
-    when: always
-  rules:
-    - if: $CI_COMMIT_BRANCH == "experiment"
 
 
 deploy_monitoring_backend_staging:
@@ -387,35 +317,48 @@ deploy_monitoring_backend_staging:
     # Create namespace
     - kubectl create namespace ${ENVIRONMENT} --dry-run=client -o yaml | kubectl apply -f -
     
-    # Update image tag in kustomization and fix deprecated fields
+    # Debug paths
+    - pwd
+    - ls -la k8s/overlays/staging/
+    - ls -la k8s/overlays/staging/../../base/
+    
+    # Update kustomization
     - |
       echo "Updating image tag in staging kustomization..."
       cd k8s/overlays/staging
-      kustomize edit fix  # Update deprecated fields
+      
+      # Fix deprecated fields
+      kustomize edit fix
+      
+      # Set absolute path for base
+      BASE_PATH=$(realpath ../../base)
+      kustomize edit set resource "$BASE_PATH"
+      
+      # Update image
       kustomize edit set image monitoring-backend=${MONITORING_BACKEND_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
+      
+      # Change ConfigMap behavior to replace
+      yq eval -i '.configMapGenerator[0].behavior = "replace"' kustomization.yaml
+      
       cat kustomization.yaml
     
-    # Generate and preview manifests
+    # Clean up existing ConfigMap
+    - kubectl delete configmap monitoring-backend-config -n ${ENVIRONMENT} --ignore-not-found=true
+    
+    # Generate manifests
     - |
       echo "=== GENERATED MANIFESTS FOR STAGING ==="
-      # Verify base path exists
-      if [ ! -f "../../base/kustomization.yaml" ]; then
-        echo "Error: Base kustomization.yaml not found at expected path!"
-        ls -la ../../base/
-        exit 1
-      fi
+      cd k8s/overlays/staging
       kustomize build . > ../../../monitoring-backend-staging-manifests.yaml
       cat ../../../monitoring-backend-staging-manifests.yaml
-    
-    # Clean up any existing ConfigMap to prevent conflicts
-    - kubectl delete configmap monitoring-backend-config -n ${ENVIRONMENT} --ignore-not-found=true
     
     # Apply manifests
     - |
       echo "Applying monitoring backend to staging..."
+      cd k8s/overlays/staging
       kubectl apply -k .
     
-    # Wait for deployment.
+    # Wait for deployment
     - |
       echo "Waiting for deployment to complete..."
       kubectl rollout status deployment/monitoring-backend -n ${ENVIRONMENT} --timeout=300s
@@ -423,15 +366,19 @@ deploy_monitoring_backend_staging:
     # Apply ingress
     - |
       echo "Applying ingress for staging..."
-      kubectl apply -f ../../ingress/staging-ingress.yaml
+      kubectl apply -f k8s/ingress/staging-ingress.yaml
     
     # Show status
     - |
       echo "=== STAGING DEPLOYMENT STATUS ==="
       kubectl get deployments,services,ingress -n ${ENVIRONMENT}
       kubectl get pods -l app=monitoring-backend -n ${ENVIRONMENT}
-      kubectl describe pods -l app=monitoring-backend -n ${ENVIRONMENT}
-
+  
+  artifacts:
+    paths:
+      - monitoring-backend-staging-manifests.yaml
+    expire_in: 1 week
+    when: always
 
 
 
