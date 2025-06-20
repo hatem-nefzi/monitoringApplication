@@ -23,3 +23,4 @@ configMapGenerator:
     literals:
       - LOG_LEVEL=DEBUG
       - ENVIRONMENT=staging
+      - SERVER_PORT=9090
