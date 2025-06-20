@@ -141,6 +141,7 @@ variables:
 
 # Common job definitions
 .monitoring_backend_deploy_base: &monitoring_backend_deploy_base
+  <<: *job_definition
   image: alpine/k8s:1.30.0
   variables:
     APP_NAME: "monitoring-backend"
