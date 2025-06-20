@@ -318,7 +318,7 @@ deploy_monitoring_backend_staging:
     
     # Debug paths and store the project root
     - PROJECT_ROOT=$(pwd)
-    - echo "Project root: $PROJECT_ROOT"
+    - echo "Project root $PROJECT_ROOT"
     - ls -la k8s/overlays/staging/
     - ls -la k8s/overlays/staging/../../base/
     
