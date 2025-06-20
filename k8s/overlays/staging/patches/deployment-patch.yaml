@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: monitoring-backend
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: monitoring-backend
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "kubernetes,staging"
+        - name: ENVIRONMENT
+          value: "staging"
+        resources:
+          limits:
+            memory: "384Mi"
+            cpu: "300m"
+          requests:
+            memory: "192Mi"
+            cpu: "150m"

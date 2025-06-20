@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: monitoring-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: monitoring-backend
+  template:
+    metadata:
+      labels:
+        app: monitoring-backend
+    spec:
+      containers:
+      - name: monitoring-backend
+        image: monitoring-backend
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9090
+          name: http
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "kubernetes"
+        - name: SERVER_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: monitoring-backend-config
+              key: SERVER_PORT
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: monitoring-backend-config
+              key: LOG_LEVEL
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 9090
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 9090
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          failureThreshold: 3
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "250m"

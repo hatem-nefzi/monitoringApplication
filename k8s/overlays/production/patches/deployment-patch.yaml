@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: monitoring-backend
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    spec:
+      containers:
+      - name: monitoring-backend
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "kubernetes,production"
+        - name: ENVIRONMENT
+          value: "production"
+        livenessProbe:
+          initialDelaySeconds: 120
+          periodSeconds: 15
+        readinessProbe:
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        resources:
+          limits:
+            memory: "768Mi"
+            cpu: "700m"
+          requests:
+            memory: "384Mi"
+            cpu: "350m"

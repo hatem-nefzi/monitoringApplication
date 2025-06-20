@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: monitoring-backend
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+      - name: monitoring-backend
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "kubernetes,gke,production"
+        - name: ENVIRONMENT
+          value: "gke"
+        - name: PLATFORM
+          value: "gcp"
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: "800m"
+          requests:
+            memory: "512Mi"
+            cpu: "400m"
+      nodeSelector:
+        cloud.google.com/gke-preemptible: "true"
+      tolerations:
+      - key: "cloud.google.com/gke-preemptible"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"

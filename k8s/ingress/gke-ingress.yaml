@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: monitoring-backend-ingress
+  namespace: monitoring-backend
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "monitoring-backend-ip"
+    networking.gke.io/managed-certificates: "monitoring-backend-ssl-cert"
+    kubernetes.io/ingress.allow-http: "true"
+    ingress.gcp.kubernetes.io/ssl-redirect: "true"
+spec:
+  rules:
+  - host: monitoring-backend.duckdns.org
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: monitoring-backend-service
+            port:
+              number: 80
+  - http:
+      paths:
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: monitoring-backend-service
+            port:
+              number: 80
