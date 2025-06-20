@@ -19,8 +19,8 @@ images:
     newName: hatemnefzi/monitoring-backend
     newTag: latest
 
-configMapGenerator:
-  - name: monitoring-backend-config
-    literals:
-      - LOG_LEVEL=INFO
-      - SERVER_PORT=9090
+#configMapGenerator:
+ # - name: monitoring-backend-config
+  #  literals:
+   #   - LOG_LEVEL=INFO
+    #  - SERVER_PORT=9090  , removed to ensure no duplicat configmap
