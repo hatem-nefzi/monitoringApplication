@@ -76,6 +76,28 @@ variables:
    # Application Configuration
   APP_NAME: "monitoring-backend"
   APP_PORT: "9090"
+  # Monitoring Backend specific variables
+  MONITORING_BACKEND_REGISTRY_IMAGE: "hatemnefzi/monitoring-backend"
+  MONITORING_BACKEND_DOCKER_USERNAME: "hatemnefzi"
+  MONITORING_BACKEND_DOCKER_PASSWORD: "your-docker-password"
+
+  # Environment specific resources
+  STAGING_MONITORING_REPLICAS: "1"
+  STAGING_MONITORING_MEMORY_REQUEST: "192Mi"
+  STAGING_MONITORING_MEMORY_LIMIT: "384Mi"
+
+  PRODUCTION_MONITORING_REPLICAS: "2"
+  PRODUCTION_MONITORING_MEMORY_REQUEST: "384Mi"
+  PRODUCTION_MONITORING_MEMORY_LIMIT: "768Mi"
+
+  GKE_MONITORING_REPLICAS: "3"
+  GKE_MONITORING_MEMORY_REQUEST: "512Mi"
+  GKE_MONITORING_MEMORY_LIMIT: "1Gi"
+  GKE_MONITORING_CPU_REQUEST: "400m"
+  KE_MONITORING_CPU_LIMIT: "800m"
+  
+
+  
 
 
 
@@ -115,6 +137,112 @@ variables:
     TARGET_ENV: "production"
     REGISTRY_URL: "$PRODUCTION_REGISTRY_URL"
     KUBE_SERVER: "https://$PRODUCTION_VM_IP:6443"  # K3s uses HTTPS and port 6443
+
+
+# Common job definitions
+.monitoring_backend_deploy_base: &monitoring_backend_deploy_base
+  image: alpine/k8s:1.30.0
+  variables:
+    APP_NAME: "monitoring-backend"
+    CONTAINER_PORT: 9090
+    SERVICE_PORT: 80
+    KUSTOMIZE_VERSION: "v5.4.3"
+  before_script:
+    - apk add --no-cache curl jq gettext
+    - echo "Installing Kustomize..."
+    - curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+    - mv kustomize /usr/local/bin/
+    - kustomize version
+
+.monitoring_staging_deploy: &monitoring_staging_deploy
+  <<: *monitoring_backend_deploy_base
+  variables:
+    ENVIRONMENT: staging
+    KUBECONFIG: "${CI_PROJECT_DIR}/.kube/config"
+    HOST_IP: "172.17.0.1"
+    KUBECTL_VERSION: "v1.32.3"
+  before_script:
+    - !reference [.monitoring_backend_deploy_base, before_script]
+    - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+    - chmod +x kubectl && mv kubectl /usr/local/bin/
+    - mkdir -p "$(dirname "$KUBECONFIG")"
+    - |
+      cat > "${KUBECONFIG}" <<EOF
+      apiVersion: v1
+      clusters:
+      - cluster:
+          server: http://${HOST_IP}:8888
+          insecure-skip-tls-verify: true
+        name: minikube
+      contexts:
+      - context:
+          cluster: minikube
+          user: gitlab-ci
+        name: minikube
+      current-context: minikube
+      kind: Config
+      preferences: {}
+      users:
+      - name: gitlab-ci
+        user: {}
+      EOF
+
+.monitoring_production_deploy: &monitoring_production_deploy
+  <<: *monitoring_backend_deploy_base
+  variables:
+    ENVIRONMENT: production
+    KUBECONFIG: "${CI_PROJECT_DIR}/.kube/config"
+  before_script:
+    - !reference [.monitoring_backend_deploy_base, before_script]
+    - mkdir -p "$(dirname "$KUBECONFIG")"
+    - |
+      cat > "${KUBECONFIG}" <<EOF
+      apiVersion: v1
+      clusters:
+      - cluster:
+          server: ${K3S_SERVER}
+          certificate-authority-data: ${K3S_CA_CERT}
+        name: k3s-cluster
+      contexts:
+      - context:
+          cluster: k3s-cluster
+          user: k3s-user
+        name: k3s-context
+      current-context: k3s-context
+      kind: Config
+      preferences: {}
+      users:
+      - name: k3s-user
+        user:
+          client-certificate-data: ${K3S_CLIENT_CERT}
+          client-key-data: ${K3S_CLIENT_KEY}
+      EOF
+    - kubectl config current-context
+    - kubectl cluster-info
+
+.monitoring_gke_deploy: &monitoring_gke_deploy
+  <<: *monitoring_backend_deploy_base
+  image: google/cloud-sdk:slim
+  variables:
+    ENVIRONMENT: gke
+    KUBECONFIG: "${CI_PROJECT_DIR}/.kube/gke-config"
+    USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
+    CLOUDSDK_CORE_PROJECT: "$GCP_PROJECT_ID"
+  before_script:
+    - apt-get update && apt-get install -y curl kubectl google-cloud-cli-gke-gcloud-auth-plugin
+    - echo "Installing Kustomize..."
+    - curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+    - mv kustomize /usr/local/bin/
+    - kustomize version
+    - echo "Setting up GCP authentication..."
+    - echo "$GCP_SERVICE_ACCOUNT_KEY" | base64 -d > /tmp/gcp-key.json
+    - gcloud auth activate-service-account --key-file /tmp/gcp-key.json
+    - gcloud config set project $GCP_PROJECT_ID
+    - export CLOUDSDK_CORE_PROJECT=$GCP_PROJECT_ID
+    - gcloud services enable container.googleapis.com cloudresourcemanager.googleapis.com
+    - gcloud container clusters get-credentials $GKE_CLUSTER_NAME --zone $GKE_ZONE
+  after_script:
+    - rm -f /tmp/gcp-key.json
 
 
 checkout:
@@ -202,6 +330,9 @@ owasp_dependency_check:
 
 
 
+
+
+
 docker_publish:
   <<: *job_definition  # Keep your shared job template here
   stage: docker
@@ -244,6 +375,61 @@ container_scan:
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
 
+
+# Staging Deployment
+deploy_monitoring_backend_staging:
+  <<: *monitoring_staging_deploy
+  stage: deploy-staging
+  script:
+    - echo "=== DEPLOYING MONITORING BACKEND TO STAGING ==="
+    - kubectl cluster-info
+    
+    # Create namespace
+    - kubectl create namespace ${ENVIRONMENT} --dry-run=client -o yaml | kubectl apply -f -
+    
+    # Update image tag in kustomization
+    - |
+      echo "Updating image tag in staging kustomization..."
+      cd k8s/overlays/staging
+      kustomize edit set image monitoring-backend=${MONITORING_BACKEND_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
+      cat kustomization.yaml
+    
+    # Generate and preview manifests
+    - |
+      echo "=== GENERATED MANIFESTS FOR STAGING ==="
+      kustomize build . > ../../../monitoring-backend-staging-manifests.yaml
+      cat ../../../monitoring-backend-staging-manifests.yaml
+    
+    # Apply manifests
+    - |
+      echo "Applying monitoring backend to staging..."
+      kubectl apply -k .
+    
+    # Wait for deployment
+    - |
+      echo "Waiting for deployment to complete..."
+      kubectl rollout status deployment/monitoring-backend -n ${ENVIRONMENT} --timeout=300s
+    
+    # Apply ingress
+    - |
+      echo "Applying ingress for staging..."
+      kubectl apply -f ../../ingress/staging-ingress.yaml
+    
+    # Show status
+    - |
+      echo "=== STAGING DEPLOYMENT STATUS ==="
+      kubectl get deployments,services,ingress -n ${ENVIRONMENT}
+      kubectl get pods -l app=monitoring-backend -n ${ENVIRONMENT}
+      kubectl describe pods -l app=monitoring-backend -n ${ENVIRONMENT}
+  
+  artifacts:
+    paths:
+      - monitoring-backend-staging-manifests.yaml
+    expire_in: 1 week
+    when: always
+  
+  rules:
+    - if: $CI_COMMIT_BRANCH == "experiment" || $CI_COMMIT_BRANCH == "develop"
 
 
 
