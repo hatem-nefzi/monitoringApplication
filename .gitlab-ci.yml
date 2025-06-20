@@ -377,7 +377,6 @@ container_scan:
     - if: $CI_COMMIT_BRANCH == "experiment"
 
 
-# Staging Deployment
 deploy_monitoring_backend_staging:
   <<: *monitoring_staging_deploy
   stage: deploy-staging
@@ -388,18 +387,28 @@ deploy_monitoring_backend_staging:
     # Create namespace
     - kubectl create namespace ${ENVIRONMENT} --dry-run=client -o yaml | kubectl apply -f -
     
-    # Update image tag in kustomization
+    # Update image tag in kustomization and fix deprecated fields
     - |
       echo "Updating image tag in staging kustomization..."
       cd k8s/overlays/staging
+      kustomize edit fix  # Update deprecated fields
       kustomize edit set image monitoring-backend=${MONITORING_BACKEND_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
       cat kustomization.yaml
     
     # Generate and preview manifests
     - |
       echo "=== GENERATED MANIFESTS FOR STAGING ==="
+      # Verify base path exists
+      if [ ! -f "../../base/kustomization.yaml" ]; then
+        echo "Error: Base kustomization.yaml not found at expected path!"
+        ls -la ../../base/
+        exit 1
+      fi
       kustomize build . > ../../../monitoring-backend-staging-manifests.yaml
       cat ../../../monitoring-backend-staging-manifests.yaml
+    
+    # Clean up any existing ConfigMap to prevent conflicts
+    - kubectl delete configmap monitoring-backend-config -n ${ENVIRONMENT} --ignore-not-found=true
     
     # Apply manifests
     - |
@@ -422,18 +431,6 @@ deploy_monitoring_backend_staging:
       kubectl get deployments,services,ingress -n ${ENVIRONMENT}
       kubectl get pods -l app=monitoring-backend -n ${ENVIRONMENT}
       kubectl describe pods -l app=monitoring-backend -n ${ENVIRONMENT}
-  
-  artifacts:
-    paths:
-      - monitoring-backend-staging-manifests.yaml
-    expire_in: 1 week
-    when: always
-  
-  rules:
-    - if: $CI_COMMIT_BRANCH == "experiment" || $CI_COMMIT_BRANCH == "develop"
-
-
-
 
 
 
