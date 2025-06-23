@@ -4,8 +4,15 @@ metadata:
   name: monitoring-backend
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: monitoring-backend
   template:
+    metadata:
+      labels:
+        app: monitoring-backend
     spec:
+      serviceAccountName: monitoring-sa  # ✅ Add this line
       containers:
       - name: monitoring-backend
         imagePullPolicy: Always

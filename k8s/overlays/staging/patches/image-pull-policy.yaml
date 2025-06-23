@@ -1,0 +1,10 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: monitoring-backend
+spec:
+  template:
+    spec:
+      containers:
+      - name: monitoring-backend
+        imagePullPolicy: Always
