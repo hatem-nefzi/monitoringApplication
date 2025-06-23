@@ -361,60 +361,92 @@ deploy_monitoring_backend_staging:
       # Based on your setup, it should be 'monitoring-backend'
       kustomize edit set image monitoring-backend=${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
       
+      # Clean up any malformed YAML by removing problematic comments
+      # This fixes the issue where comments get inserted in wrong places
+      sed -i '/# No newTag here - let CI set it dynamically/d' kustomization.yaml
+      
       echo "=== UPDATED KUSTOMIZATION ==="
       cat kustomization.yaml
       
       # Verify the image was set correctly
       echo "=== VERIFYING IMAGE UPDATE ==="
-      kustomize edit view | grep -A 10 "images:"
+      kustomize edit view | grep -A 10 "images:" || echo "No images section found"
     
     # Generate and validate manifests
     - |
       echo "=== GENERATING AND VALIDATING MANIFESTS ==="
-      kustomize build . > $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
+      if ! kustomize build . > $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml; then
+        echo "❌ ERROR Failed to build manifests with kustomize"
+        echo "=== KUSTOMIZATION CONTENT ==="
+        cat kustomization.yaml
+        echo "=== BASE DIRECTORY CONTENT ==="
+        ls -la ../../base/
+        exit 1
+      fi
       
       # Show the actual image that will be deployed
       echo "=== IMAGE IN GENERATED MANIFESTS ==="
-      grep -A 2 -B 2 "image:" $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
+      grep -A 2 -B 2 "image:" $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml || echo "No image found in manifests"
       
-      # Verify the correct image is in the deployment
-      DEPLOYED_IMAGE=$(grep -A 10 "kind Deployment" $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml | grep "image:" | head -1 | awk '{print $2}')
+      # Verify the correct image is in the deployment - improved logic
+      DEPLOYED_IMAGE=$(grep -A 20 "kind Deployment" $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml | grep "image:" | head -1 | awk '{print $2}' | tr -d '"')
       echo "Image that will be deployed $DEPLOYED_IMAGE"
       
-      if [[ "$DEPLOYED_IMAGE" == *"${CI_COMMIT_SHORT_SHA}"* ]]; then
+      if [[ -n "$DEPLOYED_IMAGE" && "$DEPLOYED_IMAGE" == *"${CI_COMMIT_SHORT_SHA}"* ]]; then
         echo "✅ Correct image with commit SHA found in manifests"
       else
         echo "❌ ERROR Generated manifests don't contain the correct image!"
         echo "Expected ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
         echo "Found $DEPLOYED_IMAGE"
+        echo "=== FULL MANIFEST CONTENT ==="
+        cat $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
         exit 1
       fi
     
     # Apply the manifests
     - |
       echo "=== APPLYING MANIFESTS ==="
-      kubectl apply -k .
+      if ! kubectl apply -k .; then
+        echo "❌ ERROR Failed to apply manifests"
+        echo "=== KUBECTL DESCRIBE EVENTS ==="
+        kubectl get events -n ${ENVIRONMENT} --sort-by='.lastTimestamp' | tail -20
+        exit 1
+      fi
     
     # Wait a moment for the deployment to be updated
-    - sleep 10
+    - sleep 15
     
     # Force a rollout restart to ensure the new image is pulled
     - |
       echo "=== FORCING DEPLOYMENT RESTART ==="
-      kubectl rollout restart deployment/monitoring-backend -n ${ENVIRONMENT}
+      if ! kubectl rollout restart deployment/monitoring-backend -n ${ENVIRONMENT}; then
+        echo "❌ ERROR Failed to restart deployment"
+        kubectl get deployments -n ${ENVIRONMENT}
+        exit 1
+      fi
     
-    # Wait for the rollout to complete
+    # Wait for the rollout to complete with better error handling
     - |
       echo "=== WAITING FOR ROLLOUT ==="
-      kubectl rollout status deployment/monitoring-backend -n ${ENVIRONMENT} --timeout=600s
+      if ! kubectl rollout status deployment/monitoring-backend -n ${ENVIRONMENT} --timeout=600s; then
+        echo "❌ ERROR Rollout failed or timed out"
+        echo "=== DEPLOYMENT STATUS ==="
+        kubectl describe deployment monitoring-backend -n ${ENVIRONMENT}
+        echo "=== POD STATUS ==="
+        kubectl get pods -l app=monitoring-backend -n ${ENVIRONMENT}
+        kubectl describe pods -l app=monitoring-backend -n ${ENVIRONMENT}
+        echo "=== RECENT EVENTS ==="
+        kubectl get events -n ${ENVIRONMENT} --sort-by='.lastTimestamp' | tail -20
+        exit 1
+      fi
     
     # Verify the deployment has the correct image
     - |
       echo "=== VERIFYING DEPLOYED IMAGE ==="
-      ACTUAL_IMAGE=$(kubectl get deployment monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.spec.template.spec.containers[0].image}')
+      ACTUAL_IMAGE=$(kubectl get deployment monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)
       echo "Actual deployed image: $ACTUAL_IMAGE"
       
-      if [[ "$ACTUAL_IMAGE" == *"${CI_COMMIT_SHORT_SHA}"* ]]; then
+      if [[ -n "$ACTUAL_IMAGE" && "$ACTUAL_IMAGE" == *"${CI_COMMIT_SHORT_SHA}"* ]]; then
         echo "✅ SUCCESS Deployment is using the correct commit-specific image!"
       else
         echo "❌ WARNING Deployment is not using the commit-specific image"
@@ -423,14 +455,22 @@ deploy_monitoring_backend_staging:
         
         # Try to force update the deployment directly
         echo "=== ATTEMPTING DIRECT IMAGE UPDATE ==="
-        kubectl patch deployment monitoring-backend -n ${ENVIRONMENT} -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"monitoring-backend\",\"image\":\"${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}\"}]}}}}"
-        
-        # Wait for the patch to take effect
-        kubectl rollout status deployment/monitoring-backend -n ${ENVIRONMENT} --timeout=300s
-        
-        # Check again
-        FINAL_IMAGE=$(kubectl get deployment monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.spec.template.spec.containers[0].image}')
-        echo "Final deployed image $FINAL_IMAGE"
+        if kubectl patch deployment monitoring-backend -n ${ENVIRONMENT} -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"monitoring-backend\",\"image\":\"${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}\"}]}}}}"; then
+          # Wait for the patch to take effect
+          kubectl rollout status deployment/monitoring-backend -n ${ENVIRONMENT} --timeout=300s
+          
+          # Check again
+          FINAL_IMAGE=$(kubectl get deployment monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.spec.template.spec.containers[0].image}')
+          echo "Final deployed image $FINAL_IMAGE"
+          
+          if [[ "$FINAL_IMAGE" != *"${CI_COMMIT_SHORT_SHA}"* ]]; then
+            echo "❌ ERROR Still unable to set correct image"
+            exit 1
+          fi
+        else
+          echo "❌ ERROR Failed to patch deployment"
+          exit 1
+        fi
       fi
     
     # Apply ingress if it exists
@@ -455,17 +495,26 @@ deploy_monitoring_backend_staging:
       
       # Show pod details to verify the image
       echo "=== POD IMAGE VERIFICATION ==="
-      kubectl get pods -l app=monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.items[*].spec.containers[0].image}'
+      kubectl get pods -l app=monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.items[*].spec.containers[0].image}' 2>/dev/null || echo "No pods found"
       echo ""
       
       # Show recent events
       echo "=== RECENT EVENTS ==="
       kubectl get events -n ${ENVIRONMENT} --sort-by='.lastTimestamp' | tail -10
+    
+    # Final success check
+    - |
+      echo "=== FINAL SUCCESS VERIFICATION ==="
+      FINAL_VERIFICATION=$(kubectl get deployment monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)
+      if [[ "$FINAL_VERIFICATION" == *"${CI_COMMIT_SHORT_SHA}"* ]]; then
+        echo "✅ DEPLOYMENT SUCCESSFUL Image ${FINAL_VERIFICATION} is running"
+        exit 0
+      else
+        echo "❌ DEPLOYMENT VERIFICATION FAILED"
+        echo "Expected SHA ${CI_COMMIT_SHORT_SHA}"
+        echo "Actual image $FINAL_VERIFICATION"
+        exit 1
+      fi
   
-  artifacts:
-    paths:
-      - monitoring-backend-staging-manifests.yaml
-    expire_in: 1 week
-    when: always
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
