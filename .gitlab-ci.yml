@@ -320,6 +320,7 @@ deploy_monitoring_backend_staging:
     - echo "=== DEPLOYING MONITORING BACKEND TO STAGING ==="
     - echo "Using commit SHA ${CI_COMMIT_SHORT_SHA}"
     - echo "Registry image ${CI_REGISTRY_IMAGE}"
+    - echo "Full versioned image ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
     - kubectl cluster-info
     
     # Create namespace
@@ -337,6 +338,11 @@ deploy_monitoring_backend_staging:
     # Clean up existing ConfigMap first
     - kubectl delete configmap monitoring-backend-config -n ${ENVIRONMENT} --ignore-not-found=true
     
+    # Show current kustomization before changes
+    - |
+      echo "=== CURRENT KUSTOMIZATION BEFORE CHANGES ==="
+      cat kustomization.yaml
+    
     # Fix deprecated kustomize syntax automatically
     - |
       echo "=== FIXING KUSTOMIZE SYNTAX ==="
@@ -347,38 +353,50 @@ deploy_monitoring_backend_staging:
       echo "=== UPDATING IMAGE TAG ==="
       echo "Setting image to: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
       
-      # Use kustomize to set the image with the dynamic commit SHA
+      # First, check what images are currently in the kustomization
+      echo "Current images in kustomization:"
+      kustomize edit view | grep -A 10 "images:" || echo "No images found"
+      
+      # Use the correct image name from your kustomization.yaml
+      # Based on your setup, it should be 'monitoring-backend'
       kustomize edit set image monitoring-backend=${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
       
-      echo "Updated kustomization.yaml:"
+      echo "=== UPDATED KUSTOMIZATION ==="
       cat kustomization.yaml
+      
+      # Verify the image was set correctly
+      echo "=== VERIFYING IMAGE UPDATE ==="
+      kustomize edit view | grep -A 10 "images:"
     
-    # Validate the kustomization before applying
+    # Generate and validate manifests
     - |
-      echo "=== VALIDATING KUSTOMIZATION ==="
-      kustomize build .  > $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
+      echo "=== GENERATING AND VALIDATING MANIFESTS ==="
+      kustomize build . > $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
       
-      # Check for common issues in the generated manifests
-      echo "=== CHECKING FOR MANIFEST ISSUES ==="
+      # Show the actual image that will be deployed
+      echo "=== IMAGE IN GENERATED MANIFESTS ==="
+      grep -A 2 -B 2 "image:" $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
       
-      # Check for valueFrom conflicts
-      if grep -n "valueFrom:" $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml; then
-        echo "Found valueFrom entries - checking for conflicts..."
-        # Show env section for debugging
-        sed -n '/env:/,/resources:/p' $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
+      # Verify the correct image is in the deployment
+      DEPLOYED_IMAGE=$(grep -A 10 "kind Deployment" $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml | grep "image:" | head -1 | awk '{print $2}')
+      echo "Image that will be deployed $DEPLOYED_IMAGE"
+      
+      if [[ "$DEPLOYED_IMAGE" == *"${CI_COMMIT_SHORT_SHA}"* ]]; then
+        echo "✅ Correct image with commit SHA found in manifests"
+      else
+        echo "❌ ERROR Generated manifests don't contain the correct image!"
+        echo "Expected ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
+        echo "Found $DEPLOYED_IMAGE"
+        exit 1
       fi
-      
-      # Show the image being used in the deployment
-      echo "=== IMAGE IN DEPLOYMENT ==="
-      grep -A 5 -B 5 "image:" $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml || echo "No image found in manifests"
     
     # Apply the manifests
     - |
       echo "=== APPLYING MANIFESTS ==="
-      kubectl apply -k . --dry-run=client -o yaml | kubectl apply -f -
+      kubectl apply -k .
     
-    # Wait a moment for the deployment to be created/updated
-    - sleep 5
+    # Wait a moment for the deployment to be updated
+    - sleep 10
     
     # Force a rollout restart to ensure the new image is pulled
     - |
@@ -389,6 +407,31 @@ deploy_monitoring_backend_staging:
     - |
       echo "=== WAITING FOR ROLLOUT ==="
       kubectl rollout status deployment/monitoring-backend -n ${ENVIRONMENT} --timeout=600s
+    
+    # Verify the deployment has the correct image
+    - |
+      echo "=== VERIFYING DEPLOYED IMAGE ==="
+      ACTUAL_IMAGE=$(kubectl get deployment monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.spec.template.spec.containers[0].image}')
+      echo "Actual deployed image: $ACTUAL_IMAGE"
+      
+      if [[ "$ACTUAL_IMAGE" == *"${CI_COMMIT_SHORT_SHA}"* ]]; then
+        echo "✅ SUCCESS Deployment is using the correct commit-specific image!"
+      else
+        echo "❌ WARNING Deployment is not using the commit-specific image"
+        echo "Expected ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
+        echo "Actual  $ACTUAL_IMAGE"
+        
+        # Try to force update the deployment directly
+        echo "=== ATTEMPTING DIRECT IMAGE UPDATE ==="
+        kubectl patch deployment monitoring-backend -n ${ENVIRONMENT} -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"monitoring-backend\",\"image\":\"${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}\"}]}}}}"
+        
+        # Wait for the patch to take effect
+        kubectl rollout status deployment/monitoring-backend -n ${ENVIRONMENT} --timeout=300s
+        
+        # Check again
+        FINAL_IMAGE=$(kubectl get deployment monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.spec.template.spec.containers[0].image}')
+        echo "Final deployed image  $FINAL_IMAGE"
+      fi
     
     # Apply ingress if it exists
     - |
@@ -401,7 +444,7 @@ deploy_monitoring_backend_staging:
     
     # Show final deployment status
     - |
-      echo "=== DEPLOYMENT STATUS ==="
+      echo "=== FINAL DEPLOYMENT STATUS ==="
       kubectl get deployments,services,configmaps -n ${ENVIRONMENT}
       kubectl get pods -l app=monitoring-backend -n ${ENVIRONMENT}
       
@@ -410,9 +453,10 @@ deploy_monitoring_backend_staging:
       kubectl get deployment monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.spec.template.spec.containers[0].image}'
       echo ""
       
-      # Show environment variables for debugging
-      echo "=== ENVIRONMENT VARIABLES ==="
-      kubectl get deployment monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.spec.template.spec.containers[0].env}' | jq .
+      # Show pod details to verify the image
+      echo "=== POD IMAGE VERIFICATION ==="
+      kubectl get pods -l app=monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.items[*].spec.containers[0].image}'
+      echo ""
       
       # Show recent events
       echo "=== RECENT EVENTS ==="
