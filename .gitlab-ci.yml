@@ -289,8 +289,8 @@ docker_publish:
     DOCKER_BUILDKIT: 1
   before_script:
     - apk add --no-cache curl
-    - echo "Using GitLab Container Registry: $CI_REGISTRY_IMAGE"
-    - echo "Commit SHA: ${CI_COMMIT_SHORT_SHA}"
+    - echo "Using GitLab Container Registry $CI_REGISTRY_IMAGE"
+    - echo "Commit SHA ${CI_COMMIT_SHORT_SHA}"
 
   script:
     - echo "=== BUILDING DOCKER IMAGE ==="
@@ -327,11 +327,11 @@ deploy_monitoring_backend_staging:
     
     # Store the project root
     - PROJECT_ROOT=$(pwd)
-    - echo "Project root: $PROJECT_ROOT"
+    - echo "Project root $PROJECT_ROOT"
     
     # Navigate to staging overlay directory
     - cd $PROJECT_ROOT/k8s/overlays/staging
-    - echo "Current directory: $(pwd)"
+    - echo "Current directory $(pwd)"
     - ls -la
     
     # Clean up existing ConfigMap first
