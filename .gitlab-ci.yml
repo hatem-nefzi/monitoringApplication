@@ -281,7 +281,7 @@ build:
 
 
 docker_publish:
-  <<: *job_definition  # Keep your shared job template here
+  <<: *job_definition
   stage: docker
   image: docker:24.0
   variables:
@@ -289,18 +289,25 @@ docker_publish:
     DOCKER_BUILDKIT: 1
   before_script:
     - apk add --no-cache curl
-    - echo "Using GitLab Container Registry->$CI_REGISTRY_IMAGE"
+    - echo "Using GitLab Container Registry $CI_REGISTRY_IMAGE"
+    - echo "Commit SHA ${CI_COMMIT_SHORT_SHA}"
 
   script:
-    - echo "Building Docker image with version tag and 'latest' tag..."
+    - echo "=== BUILDING DOCKER IMAGE ==="
     - docker build -t "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}" -t "$CI_REGISTRY_IMAGE:latest" .
 
-    - echo "Logging into GitLab Container Registry..."
+    - echo "=== LOGGING INTO GITLAB CONTAINER REGISTRY ==="
     - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
 
-    - echo "Pushing versioned and latest tags..."
+    - echo "=== PUSHING IMAGES ==="
+    - echo "Pushing versioned tag $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
     - docker push "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    - echo "Pushing latest tag $CI_REGISTRY_IMAGE:latest"
     - docker push "$CI_REGISTRY_IMAGE:latest"
+    
+    - echo "=== IMAGES PUSHED SUCCESSFULLY ==="
+    - echo "Versioned , $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    - echo "Latest,  $CI_REGISTRY_IMAGE:latest"
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
 
@@ -311,74 +318,92 @@ deploy_monitoring_backend_staging:
   stage: deploy-staging
   script:
     - echo "=== DEPLOYING MONITORING BACKEND TO STAGING ==="
+    - echo "Using commit SHA ${CI_COMMIT_SHORT_SHA}"
+    - echo "Registry image ${CI_REGISTRY_IMAGE}"
     - kubectl cluster-info
     
     # Create namespace
     - kubectl create namespace ${ENVIRONMENT} --dry-run=client -o yaml | kubectl apply -f -
     
-    # Debug paths and store the project root
+    # Store the project root
     - PROJECT_ROOT=$(pwd)
     - echo "Project root $PROJECT_ROOT"
-    - ls -la k8s/overlays/staging/
-    - ls -la k8s/overlays/staging/../../base/
+    
+    # Navigate to staging overlay directory
+    - cd $PROJECT_ROOT/k8s/overlays/staging
+    - echo "Current directory $(pwd)"
+    - ls -la
     
     # Clean up existing ConfigMap first
     - kubectl delete configmap monitoring-backend-config -n ${ENVIRONMENT} --ignore-not-found=true
     
-    # Update kustomization in staging overlay with dynamic commit SHA tag
+    # Update kustomization with the current commit SHA tag
     - |
-      echo "Updating image tag in staging kustomization with commit SHA: ${CI_COMMIT_SHORT_SHA} ..."
-      cd $PROJECT_ROOT/k8s/overlays/staging
+      echo "=== UPDATING IMAGE TAG ==="
+      echo "Setting image to: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
       
-      # Fix deprecated fields in kustomization.yaml (optional)
-      kustomize edit fix
-      
-      # Dynamically update the image tag to the current commit SHA
-      kustomize edit set image monitoring-backend=${MONITORING_BACKEND_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
-      
-      # Ensure ConfigMap behavior is set to replace
-      if grep -q "behavior:" kustomization.yaml; then
-        sed -i 's/behavior:.*/behavior: replace/' kustomization.yaml
-      else
-        sed -i '/configMapGenerator:/,/name: monitoring-backend-config/ s/name: monitoring-backend-config/behavior: replace\n    name: monitoring-backend-config/' kustomization.yaml
-      fi
+      # Use kustomize to set the image with the dynamic commit SHA
+      kustomize edit set image monitoring-backend=${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
       
       echo "Updated kustomization.yaml:"
       cat kustomization.yaml
     
-    # Generate and show manifests
+    # Generate manifests and show them for debugging
     - |
-      echo "=== GENERATING MANIFESTS FOR STAGING ==="
+      echo "=== GENERATING MANIFESTS ==="
       kustomize build . > $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
-      echo "Generated manifests:"
-      cat $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
+      echo "Generated manifests preview (first 50 lines):"
+      head -50 $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
+      
+      # Show the image being used in the deployment
+      echo "=== IMAGE IN DEPLOYMENT ==="
+      grep -A 5 -B 5 "image:" $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml || echo "No image found in manifests"
     
-    # Apply manifests to the cluster
+    # Apply the manifests
     - |
-      echo "Applying monitoring backend to staging..."
+      echo "=== APPLYING MANIFESTS ==="
       kubectl apply -k .
     
-    # Wait for deployment rollout to complete
+    # Force a rollout restart to ensure the new image is pulled
     - |
-      echo "Waiting for deployment rollout to complete..."
-      kubectl rollout status deployment/monitoring-backend -n ${ENVIRONMENT} --timeout=300s
+      echo "=== FORCING DEPLOYMENT RESTART ==="
+      kubectl rollout restart deployment/monitoring-backend -n ${ENVIRONMENT}
     
-    # Apply ingress configuration
+    # Wait for the rollout to complete
     - |
-      echo "Applying ingress for staging..."
-      cd $PROJECT_ROOT
-      kubectl apply -f k8s/ingress/staging-ingress.yaml
+      echo "=== WAITING FOR ROLLOUT ==="
+      kubectl rollout status deployment/monitoring-backend -n ${ENVIRONMENT} --timeout=600s
     
-    # Show current deployment status and pods
+    # Apply ingress if it exists
     - |
-      echo "=== STAGING DEPLOYMENT STATUS ==="
+      echo "=== APPLYING INGRESS ==="
+      if [ -f "$PROJECT_ROOT/k8s/ingress/staging-ingress.yaml" ]; then
+        kubectl apply -f $PROJECT_ROOT/k8s/ingress/staging-ingress.yaml
+      else
+        echo "No staging ingress file found, skipping..."
+      fi
+    
+    # Show final deployment status
+    - |
+      echo "=== DEPLOYMENT STATUS ==="
       kubectl get deployments,services,ingress -n ${ENVIRONMENT}
       kubectl get pods -l app=monitoring-backend -n ${ENVIRONMENT}
+      
+      # Show the actual image being used
+      echo "=== CURRENT IMAGE IN DEPLOYMENT ==="
+      kubectl get deployment monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.spec.template.spec.containers[0].image}'
+      echo ""
+      
+      # Show pod details
+      echo "=== POD DETAILS ==="
+      kubectl describe pods -l app=monitoring-backend -n ${ENVIRONMENT} | grep -A 3 -B 3 "Image:"
   
   artifacts:
     paths:
       - monitoring-backend-staging-manifests.yaml
     expire_in: 1 week
     when: always
+  rules:
+    - if: $CI_COMMIT_BRANCH == "experiment"
 
 
