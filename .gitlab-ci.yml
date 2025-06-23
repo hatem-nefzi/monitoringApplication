@@ -419,7 +419,7 @@ deploy_monitoring_backend_staging:
       else
         echo "❌ WARNING Deployment is not using the commit-specific image"
         echo "Expected ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
-        echo "Actual  $ACTUAL_IMAGE"
+        echo "Actual $ACTUAL_IMAGE"
         
         # Try to force update the deployment directly
         echo "=== ATTEMPTING DIRECT IMAGE UPDATE ==="
@@ -430,7 +430,7 @@ deploy_monitoring_backend_staging:
         
         # Check again
         FINAL_IMAGE=$(kubectl get deployment monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.spec.template.spec.containers[0].image}')
-        echo "Final deployed image  $FINAL_IMAGE"
+        echo "Final deployed image $FINAL_IMAGE"
       fi
     
     # Apply ingress if it exists
@@ -462,7 +462,10 @@ deploy_monitoring_backend_staging:
       echo "=== RECENT EVENTS ==="
       kubectl get events -n ${ENVIRONMENT} --sort-by='.lastTimestamp' | tail -10
   
-  
-  
+  artifacts:
+    paths:
+      - monitoring-backend-staging-manifests.yaml
+    expire_in: 1 week
+    when: always
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
