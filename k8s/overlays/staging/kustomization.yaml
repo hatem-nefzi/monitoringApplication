@@ -3,19 +3,15 @@ kind: Kustomization
 namespace: staging
 resources:
   - ../../base
-
 patches:
   - path: patches/deployment-patch.yaml
-
 images:
   - name: monitoring-backend    # ← This name must match the container name in your base deployment
     newName: monitoring-backend # ← This will be replaced by the CI command
     
-
 labels:
   - pairs:
       environment: staging
-
 configMapGenerator:
   - name: monitoring-backend-config
     behavior: replace
