@@ -4,29 +4,31 @@ metadata:
   name: monitoring-backend
 spec:
   replicas: 1
-  selector:
-    matchLabels:
-      app: monitoring-backend
   template:
-    metadata:
-      labels:
-        app: monitoring-backend
     spec:
-      serviceAccountName: monitoring-sa  # ✅ Add this line
       containers:
       - name: monitoring-backend
-        imagePullPolicy: Always
+        imagePullPolicy: Always  # Force pull every time
+        resources:
+          requests:
+            memory: "192Mi"
+            cpu: "100m"
+          limits:
+            memory: "384Mi"
+            cpu: "200m"
+        # Fixed env section - only use 'value' OR 'valueFrom', never both
         env:
         - name: SPRING_PROFILES_ACTIVE
-          value: "kubernetes,staging"
-        - name: ENVIRONMENT
           value: "staging"
         - name: SERVER_PORT
           value: "9090"
-        resources:
-          limits:
-            memory: "384Mi"
-            cpu: "300m"
-          requests:
-            memory: "192Mi"
-            cpu: "150m"
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: monitoring-backend-config
+              key: LOG_LEVEL
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: monitoring-backend-config
+              key: ENVIRONMENT

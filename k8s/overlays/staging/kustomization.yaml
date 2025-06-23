@@ -3,15 +3,21 @@ kind: Kustomization
 namespace: staging
 resources:
   - ../../base
-patchesStrategicMerge:
-  - patches/deployment-patch.yaml
-  - patches/image-pull-policy.yaml  # Add this patch
+
+# Use 'patches' instead of deprecated 'patchesStrategicMerge'
+patches:
+  - path: patches/deployment-patch.yaml
+
 images:
   - name: monitoring-backend
-    newName: hatemnefzi/monitoring-backend
-    #no newTage here , let CI set it dynamically
-commonLabels:
-  environment: staging
+    newName: monitoring-backend  # This will be replaced by CI
+    # No newTag here - let CI set it dynamically
+
+# Use 'labels' instead of deprecated 'commonLabels'
+labels:
+  - pairs:
+      environment: staging
+
 configMapGenerator:
   - name: monitoring-backend-config
     behavior: replace
