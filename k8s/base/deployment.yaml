@@ -16,7 +16,6 @@ spec:
     spec:
       containers:
       - name: monitoring-backend
-        image: monitoring-backend:latest  # This will be replaced by kustomize
         imagePullPolicy: Always
         ports:
         - containerPort: 9090
