@@ -356,7 +356,7 @@ deploy_monitoring_backend_staging:
     # Validate the kustomization before applying
     - |
       echo "=== VALIDATING KUSTOMIZATION ==="
-      kustomize build . --dry-run > $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
+      kustomize build .  > $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
       
       # Check for common issues in the generated manifests
       echo "=== CHECKING FOR MANIFEST ISSUES ==="
