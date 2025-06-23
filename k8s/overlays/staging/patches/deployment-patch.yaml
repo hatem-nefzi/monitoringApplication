@@ -8,11 +8,14 @@ spec:
     spec:
       containers:
       - name: monitoring-backend
+        imagePullPolicy: Always
         env:
         - name: SPRING_PROFILES_ACTIVE
           value: "kubernetes,staging"
         - name: ENVIRONMENT
           value: "staging"
+        - name: SERVER_PORT
+          value: "9090"
         resources:
           limits:
             memory: "384Mi"

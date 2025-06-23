@@ -12,8 +12,7 @@ patchesStrategicMerge:
 images:
   - name: monitoring-backend
     newName: hatemnefzi/monitoring-backend
-    newTag: staging
-
+    #no newTage here , let CI set it dynamically
 commonLabels:
   environment: staging
 

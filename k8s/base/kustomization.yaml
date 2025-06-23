@@ -16,8 +16,7 @@ commonLabels:
 
 images:
   - name: monitoring-backend
-    newName: hatemnefzi/monitoring-backend
-    newTag: latest
+   
 
 configMapGenerator:
   - name: monitoring-backend-config
