@@ -4,16 +4,14 @@ namespace: staging
 resources:
   - ../../base
 
-# Use 'patches' instead of deprecated 'patchesStrategicMerge'
 patches:
   - path: patches/deployment-patch.yaml
 
 images:
-  - name: monitoring-backend
-    newName: monitoring-backend  # This will be replaced by CI
-    # No newTag here - let CI set it dynamically
+  - name: monitoring-backend    # ← This name must match the container name in your base deployment
+    newName: monitoring-backend # ← This will be replaced by the CI command
+    
 
-# Use 'labels' instead of deprecated 'commonLabels'
 labels:
   - pairs:
       environment: staging
