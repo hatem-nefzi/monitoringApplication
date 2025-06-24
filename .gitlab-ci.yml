@@ -318,6 +318,17 @@ deploy_monitoring_backend_staging:
   stage: deploy-staging
   variables:
     ENVIRONMENT: staging
+  before_script:
+    # Install kubectl properly
+    - apk add --no-cache curl
+    - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    - chmod +x kubectl
+    - mv kubectl /usr/local/bin/
+    - kubectl version --client
+    # Install kustomize
+    - curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+    - mv kustomize /usr/local/bin/
+    - kustomize version
   script:
     - echo "=== DEPLOYING MONITORING BACKEND TO STAGING ==="
     - echo "Using commit SHA ${CI_COMMIT_SHORT_SHA}"
