@@ -522,7 +522,7 @@ monitoring_staging_smoke_tests:
     - echo "Starting port-forward to $POD_NAME..."
     - kubectl port-forward pod/$POD_NAME 9090:9090 -n ${ENVIRONMENT} > /tmp/port-forward.log 2>&1 &
     - PORT_FORWARD_PID=$!
-    - echo "Port-forward PID: $PORT_FORWARD_PID"
+    - echo "Port-forward PID $PORT_FORWARD_PID"
     
     # Wait for port-forward to establish
     - echo "Waiting for port-forward to establish..."
