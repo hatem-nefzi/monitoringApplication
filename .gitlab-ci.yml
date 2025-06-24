@@ -479,7 +479,7 @@ monitoring_staging_smoke_tests:
     KUBECONFIG: "${CI_PROJECT_DIR}/.kube/config"
     HOST_IP: "172.17.0.1"
   before_script:
-    - apk add --no-cache curl jq bash
+    - apk add --no-cache curl jq bash procps
     - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
     - chmod +x kubectl && mv kubectl /usr/local/bin/
     - mkdir -p "$(dirname "$KUBECONFIG")"
@@ -514,12 +514,49 @@ monitoring_staging_smoke_tests:
     - POD_NAME=$(kubectl get pods -n ${ENVIRONMENT} -l app=monitoring-backend -o jsonpath='{.items[0].metadata.name}')
     - echo "Using pod $POD_NAME"
 
-    # Start port-forwarding
-    - echo "Port-forwarding to $POD_NAME..."
-    - kubectl port-forward pod/$POD_NAME 9090:9090 -n ${ENVIRONMENT} &
-    - PORT_FORWARD_PID=$!
-    - sleep 5
+    # Verify pod is actually running
+    - kubectl get pod $POD_NAME -n ${ENVIRONMENT}
+    - kubectl describe pod $POD_NAME -n ${ENVIRONMENT} | grep -A 5 "Conditions:"
 
+    # Start port-forwarding with better error handling
+    - echo "Starting port-forward to $POD_NAME..."
+    - kubectl port-forward pod/$POD_NAME 9090:9090 -n ${ENVIRONMENT} > /tmp/port-forward.log 2>&1 &
+    - PORT_FORWARD_PID=$!
+    - echo "Port-forward PID: $PORT_FORWARD_PID"
+    
+    # Wait for port-forward to establish
+    - echo "Waiting for port-forward to establish..."
+    - sleep 10
+    
+    # Check if port-forward is still running
+    - |
+      if ! kill -0 $PORT_FORWARD_PID 2>/dev/null; then
+        echo "❌ Port-forward process died"
+        echo "Port-forward logs:"
+        cat /tmp/port-forward.log || true
+        exit 1
+      fi
+    
+    # Test if port is actually listening
+    - |
+      echo "Testing if port 9090 is listening..."
+      for i in $(seq 1 30); do
+        if netstat -ln 2>/dev/null | grep :9090 || ss -ln 2>/dev/null | grep :9090; then
+          echo "✅ Port 9090 is listening"
+          break
+        else
+          echo "Waiting for port 9090 to be available... ($i/30)"
+          sleep 2
+        fi
+        if [ $i -eq 30 ]; then
+          echo "❌ Port 9090 never became available"
+          echo "Port-forward logs:"
+          cat /tmp/port-forward.log || true
+          exit 1
+        fi
+      done
+
+    # Run smoke tests
     - |
       echo "=== SMOKE TESTS ==="
       endpoints="/api/kubernetes/pods /actuator/health"
@@ -527,27 +564,45 @@ monitoring_staging_smoke_tests:
 
       for endpoint in $endpoints; do
         echo "Testing endpoint $endpoint with retry..."
-        for i in {1..10}; do
-          if curl -sf http://localhost:9090$endpoint; then
+        success=false
+        
+        for i in $(seq 1 10); do
+          echo "Attempt $i for $endpoint..."
+          if curl -sf --max-time 10 http://localhost:9090$endpoint; then
             echo "✅ $endpoint is OK"
+            success=true
             break
           else
-            echo "❌ Attempt $i failed for $endpoint. Retrying in 5s..."
-            sleep 5
-          fi
-
-          if [ $i -eq 10 ]; then
-            echo "❌ $endpoint failed after 10 attempts"
-            ALL_PASSED=false
+            echo "❌ Attempt $i failed for $endpoint"
+            if [ $i -lt 10 ]; then
+              echo "Retrying in 5s..."
+              sleep 5
+            fi
           fi
         done
+        
+        if [ "$success" = false ]; then
+          echo "❌ $endpoint failed after 10 attempts"
+          ALL_PASSED=false
+        fi
       done
 
-    # Cleanup port-forward
-    - kill $PORT_FORWARD_PID || true
-    - sleep 2
+    # Show port-forward logs for debugging
+    - echo "Port-forward logs:"
+    - cat /tmp/port-forward.log || true
 
-    # Final status
+  after_script:
+    # Cleanup port-forward
+    - |
+      if [ -n "$PORT_FORWARD_PID" ]; then
+        echo "Cleaning up port-forward process $PORT_FORWARD_PID"
+        kill $PORT_FORWARD_PID 2>/dev/null || true
+        sleep 2
+        # Force kill if still running
+        kill -9 $PORT_FORWARD_PID 2>/dev/null || true
+      fi
+    
+    # Final status check
     - |
       if [ "$ALL_PASSED" = false ]; then
         echo "❌ Smoke tests failed"
