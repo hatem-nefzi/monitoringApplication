@@ -1,8 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: monitoring-backend-role
-  namespace: staging
+  name: monitoring-backend-role #namespace:staging
 rules:
 - apiGroups: [""]
   resources: ["pods"]
