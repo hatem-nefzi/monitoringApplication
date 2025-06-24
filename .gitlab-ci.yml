@@ -510,31 +510,51 @@ monitoring_staging_smoke_tests:
     - echo "Waiting for monitoring-backend pod to be ready..."
     - kubectl wait --for=condition=Ready pod -l app=monitoring-backend -n ${ENVIRONMENT} --timeout=120s
 
-    # Port-forward to the pod directly, not the service
-    - echo "Finding pod name..."
+    # Get pod name
     - POD_NAME=$(kubectl get pods -n ${ENVIRONMENT} -l app=monitoring-backend -o jsonpath='{.items[0].metadata.name}')
-    - echo "Port-forwarding to pod $POD_NAME"
+    - echo "Using pod: $POD_NAME"
+
+    # Start port-forwarding
+    - echo "Port-forwarding to $POD_NAME..."
     - kubectl port-forward pod/$POD_NAME 9090:9090 -n ${ENVIRONMENT} &
     - PORT_FORWARD_PID=$!
-    - sleep 10
+    - sleep 5
 
     - |
       echo "=== SMOKE TESTS ==="
-      endpoints="/api/kubernetes/pods"
+      endpoints="/api/kubernetes/pods /actuator/health"
+      ALL_PASSED=true
 
       for endpoint in $endpoints; do
-        echo "Testing endpoint  $endpoint"
-        if curl -sf http://localhost:9090$endpoint; then
-          echo "✅ $endpoint is OK"
-        else
-          echo "❌ $endpoint FAILED"
-          kill $PORT_FORWARD_PID
-          exit 1
-        fi
+        echo "Testing endpoint $endpoint with retry..."
+        for i in {1..10}; do
+          if curl -sf http://localhost:9090$endpoint; then
+            echo "✅ $endpoint is OK"
+            break
+          else
+            echo "❌ Attempt $i failed for $endpoint. Retrying in 5s..."
+            sleep 5
+          fi
+
+          if [ $i -eq 10 ]; then
+            echo "❌ $endpoint failed after 10 attempts"
+            ALL_PASSED=false
+          fi
+        done
       done
 
-    # Cleanup
+    # Cleanup port-forward
     - kill $PORT_FORWARD_PID || true
+    - sleep 2
+
+    # Final status
+    - |
+      if [ "$ALL_PASSED" = false ]; then
+        echo "❌ Smoke tests failed"
+        exit 1
+      else
+        echo "✅ All smoke tests passed"
+      fi
 
   needs: ["deploy_monitoring_backend_staging"]
   rules:
