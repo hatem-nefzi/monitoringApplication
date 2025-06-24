@@ -6,8 +6,10 @@ resources:
 patches:
   - path: patches/deployment-patch.yaml
 images:
-  - name: monitoring-backend    # ← This name must match the container name in your base deployment
-    newName: monitoring-backend # ← This will be replaced by the CI command
+  - name: monitoring-backend
+    newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
+    newTag: ${CI_COMMIT_SHORT_SHA}
+
     
 labels:
   - pairs:
