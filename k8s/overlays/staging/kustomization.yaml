@@ -11,9 +11,6 @@ images:
     newTag: latest
 
     
-labels:
-  - pairs:
-      environment: staging
 configMapGenerator:
   - name: monitoring-backend-config
     behavior: replace
