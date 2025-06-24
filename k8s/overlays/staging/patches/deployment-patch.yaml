@@ -6,6 +6,7 @@ spec:
   replicas: 1
   template:
     spec:
+      serviceAccountName: monitoring-backend
       containers:
       - name: monitoring-backend
         imagePullPolicy: Always  # Force pull every time
