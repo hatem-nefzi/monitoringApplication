@@ -1,5 +1,5 @@
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
   name: monitoring-backend-role-binding
   namespace: staging
@@ -8,6 +8,6 @@ subjects:
   name: monitoring-backend
   namespace: staging
 roleRef:
-  kind: Role
+  kind: ClusterRole
   name: monitoring-backend-role
   apiGroup: rbac.authorization.k8s.io
