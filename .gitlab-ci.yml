@@ -339,6 +339,12 @@ deploy_monitoring_backend_staging:
     # Store the project root
     - PROJECT_ROOT=$(pwd)
     - echo "Project root $PROJECT_ROOT"
+    # Apply RBAC resources first
+    - |
+      echo "=== APPLYING RBAC RESOURCES ==="
+      kubectl apply -f $PROJECT_ROOT/k8s/base/rbac/service-account.yaml -n ${ENVIRONMENT}
+      kubectl apply -f $PROJECT_ROOT/k8s/base/rbac/role.yaml -n ${ENVIRONMENT}
+      kubectl apply -f $PROJECT_ROOT/k8s/base/rbac/role-binding.yaml -n ${ENVIRONMENT}
     
     # Navigate to staging overlay directory
     - cd $PROJECT_ROOT/k8s/overlays/staging
