@@ -334,8 +334,9 @@ deploy_monitoring_backend_staging:
     - echo "Current directory $(pwd)"
     - ls -la
     
-    # Clean up existing ConfigMap first to avoid conflicts
+    # Clean up existing resources to avoid immutable field conflicts
     - kubectl delete configmap monitoring-backend-config -n ${ENVIRONMENT} --ignore-not-found=true
+    - kubectl delete deployment monitoring-backend -n ${ENVIRONMENT} --ignore-not-found=true
     
     # Fix deprecated kustomize syntax automatically
     - |
@@ -380,19 +381,18 @@ deploy_monitoring_backend_staging:
     # Wait a moment for the deployment to be created/updated
     - sleep 5
     
-    # Check if deployment exists before trying to restart it
+    # Check if deployment was created successfully
     - |
-      echo "=== CHECKING DEPLOYMENT STATUS ==="
+      echo "=== CHECKING DEPLOYMENT CREATION ==="
+      # Wait for deployment to be created
+      sleep 10
+      
       if kubectl get deployment monitoring-backend -n ${ENVIRONMENT} >/dev/null 2>&1; then
-        echo "Deployment exists, forcing restart to pull new image..."
-        kubectl rollout restart deployment/monitoring-backend -n ${ENVIRONMENT}
-        
-        echo "=== WAITING FOR ROLLOUT ==="
+        echo "Deployment created successfully, waiting for rollout..."
         kubectl rollout status deployment/monitoring-backend -n ${ENVIRONMENT} --timeout=600s
       else
-        echo "Deployment doesn't exist yet, waiting for initial creation..."
-        sleep 10
-        kubectl rollout status deployment/monitoring-backend -n ${ENVIRONMENT} --timeout=600s
+        echo "❌ ERROR: Deployment was not created"
+        exit 1
       fi
     
     # Apply ingress if it exists
