@@ -14,6 +14,8 @@ spec:
       labels:
         app: monitoring-backend
     spec:
+      imagePullSecrets:
+      - name: gitlab-registry-secret
       containers:
       - name: monitoring-backend
         image: monitoring-backend
