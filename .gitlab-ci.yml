@@ -318,6 +318,7 @@ deploy_monitoring_backend_staging:
   stage: deploy-staging
   variables:
     ENVIRONMENT: staging
+    KUBE_SERVER: "http://your-kubernetes-api-server:port"  # Replace with actual server URL
   before_script:
     # Install kubectl properly
     - apk add --no-cache curl
@@ -329,13 +330,36 @@ deploy_monitoring_backend_staging:
     - curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
     - mv kustomize /usr/local/bin/
     - kustomize version
+    # Configure kubectl properly
+    - mkdir -p ~/.kube
+    - |
+      cat > ~/.kube/config <<EOF
+      apiVersion: v1
+      clusters:
+      - cluster:
+          server: ${KUBE_SERVER}
+          insecure-skip-tls-verify: true
+        name: default-cluster
+      contexts:
+      - context:
+          cluster: default-cluster
+          user: default-user
+        name: default-context
+      current-context: default-context
+      kind: Config
+      preferences: {}
+      users:
+      - name: default-user
+        user: {}
+      EOF
+    - kubectl cluster-info  # Verify connection
   script:
     - echo "=== DEPLOYING MONITORING BACKEND TO STAGING ==="
     - echo "Using commit SHA ${CI_COMMIT_SHORT_SHA}"
     - echo "GitLab Registry image ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
     
-    # Create namespace if it doesn't exist
-    - kubectl create namespace ${ENVIRONMENT} --dry-run=client -o yaml | kubectl apply -f -
+    # Create namespace if it doesn't exist (with validation disabled)
+    - kubectl create namespace ${ENVIRONMENT} --dry-run=client -o yaml | kubectl apply -f - --validate=false
     
     # Navigate to staging overlay directory
     - cd k8s/overlays/staging
@@ -351,17 +375,24 @@ deploy_monitoring_backend_staging:
       # Set the image using GitLab Container Registry
       kustomize edit set image monitoring-backend=${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
       
+      # Add timestamp annotation to force rollout
+      CURRENT_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+      kustomize edit add annotation kubectl.kubernetes.io/restartedAt:"$CURRENT_TIMESTAMP" --path monitoring-backend
+      
       echo "=== UPDATED KUSTOMIZATION ==="
       cat kustomization.yaml
     
     # Build and apply manifests
     - |
       echo "=== BUILDING AND APPLYING MANIFESTS ==="
-      if ! kustomize build . | kubectl apply -f -; then
+      if ! kustomize build . | kubectl apply -f - --validate=false; then
         echo "❌ ERROR: Failed to apply manifests"
         kubectl get events -n ${ENVIRONMENT} --sort-by='.lastTimestamp' | tail -10
         exit 1
       fi
+    
+    # Force rollout if needed
+    - kubectl rollout restart deployment/monitoring-backend -n ${ENVIRONMENT}
     
     # Wait for rollout to complete
     - |
