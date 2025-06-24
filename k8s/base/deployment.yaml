@@ -16,6 +16,7 @@ spec:
     spec:
       containers:
       - name: monitoring-backend
+        image: monitoring-backend
         imagePullPolicy: Always
         ports:
         - containerPort: 9090
