@@ -8,9 +8,9 @@ resources:
   - deployment.yaml
   - service.yaml
   - configmap.yaml
-  - ../rbac/service-account.yaml
-  - ../rbac/role.yaml
-  - ../rbac/role-binding.yaml
+  - rbac/service-account.yaml
+  - rbac/role.yaml
+  - rbac/role-binding.yaml
 
 commonLabels:
   app: monitoring-backend
