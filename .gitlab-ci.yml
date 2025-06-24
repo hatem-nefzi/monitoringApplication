@@ -334,7 +334,7 @@ deploy_monitoring_backend_staging:
     - echo "Current directory $(pwd)"
     - ls -la
     
-    # Clean up existing ConfigMap first
+    # Clean up existing ConfigMap first to avoid conflicts
     - kubectl delete configmap monitoring-backend-config -n ${ENVIRONMENT} --ignore-not-found=true
     
     # Fix deprecated kustomize syntax automatically
@@ -356,7 +356,7 @@ deploy_monitoring_backend_staging:
     # Validate the kustomization before applying
     - |
       echo "=== VALIDATING KUSTOMIZATION ==="
-      kustomize build .  > $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
+      kustomize build . > $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
       
       # Check for common issues in the generated manifests
       echo "=== CHECKING FOR MANIFEST ISSUES ==="
@@ -372,23 +372,28 @@ deploy_monitoring_backend_staging:
       echo "=== IMAGE IN DEPLOYMENT ==="
       grep -A 5 -B 5 "image:" $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml || echo "No image found in manifests"
     
-    # Apply the manifests
+    # Apply the manifests using the generated file to ensure consistency
     - |
       echo "=== APPLYING MANIFESTS ==="
-      kubectl apply -k . --dry-run=client -o yaml | kubectl apply -f -
+      kubectl apply -f $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
     
     # Wait a moment for the deployment to be created/updated
     - sleep 5
     
-    # Force a rollout restart to ensure the new image is pulled
+    # Check if deployment exists before trying to restart it
     - |
-      echo "=== FORCING DEPLOYMENT RESTART ==="
-      kubectl rollout restart deployment/monitoring-backend -n ${ENVIRONMENT}
-    
-    # Wait for the rollout to complete
-    - |
-      echo "=== WAITING FOR ROLLOUT ==="
-      kubectl rollout status deployment/monitoring-backend -n ${ENVIRONMENT} --timeout=600s
+      echo "=== CHECKING DEPLOYMENT STATUS ==="
+      if kubectl get deployment monitoring-backend -n ${ENVIRONMENT} >/dev/null 2>&1; then
+        echo "Deployment exists, forcing restart to pull new image..."
+        kubectl rollout restart deployment/monitoring-backend -n ${ENVIRONMENT}
+        
+        echo "=== WAITING FOR ROLLOUT ==="
+        kubectl rollout status deployment/monitoring-backend -n ${ENVIRONMENT} --timeout=600s
+      else
+        echo "Deployment doesn't exist yet, waiting for initial creation..."
+        sleep 10
+        kubectl rollout status deployment/monitoring-backend -n ${ENVIRONMENT} --timeout=600s
+      fi
     
     # Apply ingress if it exists
     - |
@@ -399,16 +404,29 @@ deploy_monitoring_backend_staging:
         echo "No staging ingress file found, skipping..."
       fi
     
-    # Show final deployment status
+    # Show final deployment status and verify the image
     - |
       echo "=== DEPLOYMENT STATUS ==="
       kubectl get deployments,services,configmaps -n ${ENVIRONMENT}
-      kubectl get pods -l app=monitoring-backend -n ${ENVIRONMENT}
+      kubectl get pods -l app=monitoring-backend -n ${ENVIRONMENT} -o wide
       
-      # Show the actual image being used
-      echo "=== CURRENT IMAGE IN DEPLOYMENT ==="
-      kubectl get deployment monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.spec.template.spec.containers[0].image}'
-      echo ""
+      # Show the actual image being used in the deployment spec
+      echo "=== CURRENT IMAGE IN DEPLOYMENT SPEC ==="
+      DEPLOYMENT_IMAGE=$(kubectl get deployment monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.spec.template.spec.containers[0].image}')
+      echo "Deployment spec image: $DEPLOYMENT_IMAGE"
+      
+      # Show the actual image being used in running pods
+      echo "=== CURRENT IMAGE IN RUNNING PODS ==="
+      kubectl get pods -l app=monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.items[*].spec.containers[0].image}' | tr ' ' '\n' | sort -u
+      
+      # Verify the image matches what we expect
+      EXPECTED_IMAGE="${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
+      if [ "$DEPLOYMENT_IMAGE" = "$EXPECTED_IMAGE" ]; then
+        echo "✅ SUCCESS: Deployment image matches expected image"
+      else
+        echo "❌ ERROR: Deployment image ($DEPLOYMENT_IMAGE) does not match expected image ($EXPECTED_IMAGE)"
+        exit 1
+      fi
       
       # Show environment variables for debugging
       echo "=== ENVIRONMENT VARIABLES ==="
@@ -417,6 +435,14 @@ deploy_monitoring_backend_staging:
       # Show recent events
       echo "=== RECENT EVENTS ==="
       kubectl get events -n ${ENVIRONMENT} --sort-by='.lastTimestamp' | tail -10
+      
+      # Final health check
+      echo "=== HEALTH CHECK ==="
+      kubectl get pods -l app=monitoring-backend -n ${ENVIRONMENT} --no-headers | while read pod rest; do
+        echo "Pod: $pod"
+        kubectl get pod $pod -n ${ENVIRONMENT} -o jsonpath='{.status.phase}'
+        echo ""
+      done
   
   artifacts:
     paths:
@@ -425,4 +451,3 @@ deploy_monitoring_backend_staging:
     when: always
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
-
