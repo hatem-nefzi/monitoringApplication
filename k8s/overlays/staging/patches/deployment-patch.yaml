@@ -5,31 +5,47 @@ metadata:
 spec:
   replicas: 1
   template:
+    metadata:
+      labels:
+        app: monitoring-backend
     spec:
       serviceAccountName: monitoring-backend
       containers:
-      - name: monitoring-backend
-        imagePullPolicy: Always  # Force pull every time
-        resources:
-          requests:
-            memory: "192Mi"
-            cpu: "100m"
-          limits:
-            memory: "384Mi"
-            cpu: "200m"
-        # Fixed env section - only use 'value' OR 'valueFrom', never both
-        env:
-        - name: SPRING_PROFILES_ACTIVE
-          value: "staging"
-        - name: SERVER_PORT
-          value: "9090"
-        - name: LOG_LEVEL
-          valueFrom:
-            configMapKeyRef:
-              name: monitoring-backend-config
-              key: LOG_LEVEL
-        - name: ENVIRONMENT
-          valueFrom:
-            configMapKeyRef:
-              name: monitoring-backend-config
-              key: ENVIRONMENT
+        - name: monitoring-backend
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9090
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 9090
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 9090
+            initialDelaySeconds: 20
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: "192Mi"
+              cpu: "100m"
+            limits:
+              memory: "384Mi"
+              cpu: "200m"
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "staging"
+            - name: SERVER_PORT
+              value: "9090"
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: monitoring-backend-config
+                  key: LOG_LEVEL
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: monitoring-backend-config
+                  key: ENVIRONMENT
