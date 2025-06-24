@@ -505,7 +505,9 @@ monitoring_staging_smoke_tests:
       EOF
   script:
     - echo "Running smoke tests against ${ENVIRONMENT} environment..."
-    - kubectl port-forward service/monitoring-backend-service 9090:80 -n ${ENVIRONMENT} &
+    - POD_NAME=$(kubectl get pods -n ${ENVIRONMENT} -l app=monitoring-backend -o jsonpath='{.items[0].metadata.name}')
+    - kubectl port-forward pod/$POD_NAME 9090:9090 -n ${ENVIRONMENT} &
+
     - PORT_FORWARD_PID=$!
     - sleep 10
 
