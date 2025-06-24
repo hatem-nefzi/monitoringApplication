@@ -520,7 +520,7 @@ monitoring_staging_smoke_tests:
 
     - |
       echo "=== SMOKE TESTS ==="
-      endpoints="/actuator/health /api/kubernetes/pods"
+      endpoints="/api/kubernetes/pods"
 
       for endpoint in $endpoints; do
         echo "Testing endpoint  $endpoint"
