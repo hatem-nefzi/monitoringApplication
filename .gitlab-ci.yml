@@ -512,7 +512,7 @@ monitoring_staging_smoke_tests:
 
     # Get pod name
     - POD_NAME=$(kubectl get pods -n ${ENVIRONMENT} -l app=monitoring-backend -o jsonpath='{.items[0].metadata.name}')
-    - echo "Using pod: $POD_NAME"
+    - echo "Using pod $POD_NAME"
 
     # Start port-forwarding
     - echo "Port-forwarding to $POD_NAME..."
