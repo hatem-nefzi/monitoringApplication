@@ -518,6 +518,27 @@ monitoring_staging_smoke_tests:
     - kubectl get pod $POD_NAME -n ${ENVIRONMENT}
     - kubectl describe pod $POD_NAME -n ${ENVIRONMENT} | grep -A 5 "Conditions:"
 
+    # Debug: Check application logs to see if it's started properly
+    - echo "=== APPLICATION LOGS ==="
+    - kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=20 || true
+
+    # Debug: Check what ports are actually listening inside the pod
+    - echo "=== CHECKING PORTS INSIDE POD ==="
+    - kubectl exec $POD_NAME -n ${ENVIRONMENT} -- sh -c "netstat -tlnp 2>/dev/null || ss -tlnp 2>/dev/null || echo 'No netstat/ss available'" || true
+    - kubectl exec $POD_NAME -n ${ENVIRONMENT} -- sh -c "ps aux" || true
+
+    # Check service configuration
+    - echo "=== SERVICE CONFIGURATION ==="
+    - kubectl get service -n ${ENVIRONMENT} -l app=monitoring-backend -o yaml || true
+
+    # Wait for application to be fully started (Spring Boot can take time)
+    - echo "Waiting additional time for Spring Boot application to fully start..."
+    - sleep 30
+
+    # Check logs again after waiting
+    - echo "=== APPLICATION LOGS AFTER WAIT ==="
+    - kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=10 || true
+
     # Start port-forwarding with better error handling
     - echo "Starting port-forward to $POD_NAME..."
     - kubectl port-forward pod/$POD_NAME 9090:9090 -n ${ENVIRONMENT} > /tmp/port-forward.log 2>&1 &
@@ -537,59 +558,87 @@ monitoring_staging_smoke_tests:
         exit 1
       fi
     
-    # Test if port is actually listening
+    # Test if port is actually listening on host
     - |
-      echo "Testing if port 9090 is listening..."
+      echo "Testing if port 9090 is listening on host..."
       for i in $(seq 1 30); do
         if netstat -ln 2>/dev/null | grep :9090 || ss -ln 2>/dev/null | grep :9090; then
-          echo "✅ Port 9090 is listening"
+          echo "✅ Port 9090 is listening on host"
           break
         else
-          echo "Waiting for port 9090 to be available... ($i/30)"
+          echo "Waiting for port 9090 to be available on host... ($i/30)"
           sleep 2
         fi
         if [ $i -eq 30 ]; then
-          echo "❌ Port 9090 never became available"
+          echo "❌ Port 9090 never became available on host"
           echo "Port-forward logs:"
           cat /tmp/port-forward.log || true
           exit 1
         fi
       done
 
-    # Run smoke tests
+    # Test direct connection to pod (bypass port-forward for debugging)
+    - |
+      echo "=== TESTING DIRECT CONNECTION TO POD ==="
+      POD_IP=$(kubectl get pod $POD_NAME -n ${ENVIRONMENT} -o jsonpath='{.status.podIP}')
+      echo "Pod IP: $POD_IP"
+      
+      # Test if we can reach the pod directly (this might not work depending on network setup)
+      echo "Testing direct connection to pod..."
+      kubectl exec $POD_NAME -n ${ENVIRONMENT} -- sh -c "curl -sf --max-time 5 http://localhost:9090/actuator/health" || echo "Direct connection to localhost:9090 failed"
+      kubectl exec $POD_NAME -n ${ENVIRONMENT} -- sh -c "curl -sf --max-time 5 http://127.0.0.1:9090/actuator/health" || echo "Direct connection to 127.0.0.1:9090 failed"
+
+    # Run smoke tests with better error reporting
     - |
       echo "=== SMOKE TESTS ==="
-      endpoints="/api/kubernetes/pods /actuator/health"
+      endpoints="/actuator/health /api/kubernetes/pods"
       ALL_PASSED=true
 
       for endpoint in $endpoints; do
         echo "Testing endpoint $endpoint with retry..."
         success=false
         
-        for i in $(seq 1 10); do
+        for i in $(seq 1 5); do
           echo "Attempt $i for $endpoint..."
-          if curl -sf --max-time 10 http://localhost:9090$endpoint; then
+          
+          # Use verbose curl for better debugging
+          response=$(curl -sf --max-time 10 -w "HTTP_CODE:%{http_code}" http://localhost:9090$endpoint 2>&1) || true
+          
+          if echo "$response" | grep -q "HTTP_CODE:200"; then
             echo "✅ $endpoint is OK"
             success=true
             break
           else
             echo "❌ Attempt $i failed for $endpoint"
-            if [ $i -lt 10 ]; then
-              echo "Retrying in 5s..."
-              sleep 5
+            echo "Response: $response"
+            
+            # Show port-forward status
+            if ! kill -0 $PORT_FORWARD_PID 2>/dev/null; then
+              echo "❌ Port-forward process is dead!"
+              cat /tmp/port-forward.log || true
+              break
+            fi
+            
+            if [ $i -lt 5 ]; then
+              echo "Retrying in 10s..."
+              sleep 10
             fi
           fi
         done
         
         if [ "$success" = false ]; then
-          echo "❌ $endpoint failed after 10 attempts"
+          echo "❌ $endpoint failed after 5 attempts"
           ALL_PASSED=false
         fi
       done
 
-    # Show port-forward logs for debugging
-    - echo "Port-forward logs:"
+    # Show final port-forward logs for debugging
+    - echo "=== FINAL PORT-FORWARD LOGS ==="
     - cat /tmp/port-forward.log || true
+
+    # Show final application logs
+    - echo "=== FINAL APPLICATION LOGS ==="
+    - kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=30 || true
 
   after_script:
     # Cleanup port-forward
@@ -604,7 +653,7 @@ monitoring_staging_smoke_tests:
     
     # Final status check
     - |
-      if [ "$ALL_PASSED" = false ]; then
+      if [ "$ALL_PASSED" != "true" ]; then
         echo "❌ Smoke tests failed"
         exit 1
       else
