@@ -482,10 +482,10 @@ monitoring_staging_smoke_tests:
     KUBECONFIG: "${CI_PROJECT_DIR}/.kube/config"
     HOST_IP: "172.17.0.1"
   before_script:
-    - apk add --no-cache curl jq bash procps wget
+    - apk add --no-cache curl jq bash wget
     - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
     - chmod +x kubectl && mv kubectl /usr/local/bin/
-    - mkdir -p "$(dirname "$KUBECONFIG")"
+    - mkdir -p "$(dirname \"$KUBECONFIG\")"
     - |
       cat > "${KUBECONFIG}" <<EOF
       apiVersion: v1
@@ -509,100 +509,40 @@ monitoring_staging_smoke_tests:
   script:
     - echo "Running smoke tests against ${ENVIRONMENT} environment..."
 
-    - echo "Waiting for monitoring-backend pod to be ready..."
-    - kubectl wait --for=condition=Ready pod -l app=monitoring-backend -n ${ENVIRONMENT} --timeout=180s
+    # Port-forward the service in background
+    - kubectl port-forward service/monitoring-backend-service-${ENVIRONMENT} 8081:9090 -n ${ENVIRONMENT} &
+    - PORT_FORWARD_PID=$!
+    - sleep 10
 
-    - POD_NAME=$(kubectl get pods -n ${ENVIRONMENT} -l app=monitoring-backend -o jsonpath='{.items[0].metadata.name}')
-    - echo "Using pod $POD_NAME"
-
-    - echo "Waiting for Spring Boot application to fully start..."
-    - |
-      for i in $(seq 1 60); do
-        if kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=5 | grep -q "Started.*Application.*in.*seconds"; then
-          echo "✅ Spring Boot application has started"
-          break
-        else
-          echo "Waiting for Spring Boot to start... ($i/60)"
-          sleep 5
-        fi
-        if [ $i -eq 60 ]; then
-          echo "❌ Spring Boot application didn't start within 5 minutes"
-          kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=20
-          exit 1
-        fi
-      done
-
-    - echo "Waiting for HTTP server to be ready inside the pod..."
-    - |
-      for i in $(seq 1 40); do
-        if kubectl exec $POD_NAME -n ${ENVIRONMENT} -- sh -c "wget --spider -q --timeout=5 http://localhost:9090/actuator/health"; then
-          echo "✅ HTTP server is ready inside the pod"
-          break
-        else
-          echo "Waiting for HTTP server to be ready inside pod... ($i/40)"
-          sleep 3
-        fi
-        if [ $i -eq 40 ]; then
-          echo "❌ HTTP server never became ready inside the pod"
-          kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=10
-          exit 1
-        fi
-      done
-
-    - echo "Running endpoint smoke tests directly inside the pod..."
+    - echo "Running endpoint smoke tests via port-forwarded connection..."
     - |
       ALL_PASSED=true
       endpoints="/actuator/health /api/kubernetes/pods"
 
       for endpoint in $endpoints; do
-        echo "Testing $endpoint directly in pod"
-        success=false
-
-        for i in $(seq 1 3); do
-          if kubectl exec $POD_NAME -n ${ENVIRONMENT} -- sh -c "wget --spider -q --timeout=10 http://localhost:9090$endpoint"; then
-            echo "✅ $endpoint is OK"
-            success=true
-            break
-          else
-            echo "❌ Attempt $i failed for $endpoint"
-            if [ $i -lt 3 ]; then
-              echo "Retrying in 5s..."
-              sleep 5
-            fi
-          fi
-        done
-
-        if [ "$success" = false ]; then
-          echo "❌ $endpoint failed after 3 attempts"
+        echo "Testing endpoint: $endpoint"
+        if wget --spider -q --timeout=10 http://localhost:8081$endpoint; then
+          echo "✅ $endpoint is OK"
+        else
+          echo "❌ $endpoint FAILED"
           ALL_PASSED=false
         fi
       done
 
-    - |
-      if [ "$ALL_PASSED" != "true" ]; then
-        echo "=== DEBUGGING INFO FOR FAILED TESTS ==="
-        echo "Application logs:"
-        kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=20 || true
-        echo "What's listening inside the pod:"
-        kubectl exec $POD_NAME -n ${ENVIRONMENT} -- sh -c "netstat -tlnp 2>/dev/null || ss -tlnp 2>/dev/null" || true
-        echo "Testing endpoints with verbose output:"
-        for endpoint in $endpoints; do
-          echo "--- Testing $endpoint ---"
-          kubectl exec $POD_NAME -n ${ENVIRONMENT} -- sh -c "wget -O- --timeout=10 http://localhost:9090$endpoint" || true
-        done
-      fi
+      echo "Smoke test result ALL_PASSED=$ALL_PASSED"
 
-    - echo "Smoke test result ALL_PASSED=$ALL_PASSED"
-    - |
-      if [ "$ALL_PASSED" = "true" ]; then
-        echo "✅ All smoke tests passed!"
-      else
-        echo "❌ Some smoke tests failed!"
+      if [ "$ALL_PASSED" != "true" ]; then
+        echo "Fetching pod logs for debugging..."
+        POD_NAME=$(kubectl get pods -n ${ENVIRONMENT} -l app=monitoring-backend -o jsonpath='{.items[0].metadata.name}')
+        kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=40 || true
         exit 1
       fi
 
+    - kill $PORT_FORWARD_PID || true
+
   needs: ["deploy_monitoring_backend_staging"]
   rules:
-    - if: '$CI_COMMIT_BRANCH == "experiment"'
+    - if: '$CI_COMMIT_BRANCH == "experiment" || $CI_COMMIT_BRANCH == "develop"'
+
 
 
