@@ -35,52 +35,50 @@ public class PodMetricsService {
     }
 
     public Map<String, String> getPodMetrics(String namespace, String podName) {
-        Map<String, String> metrics = new HashMap<>();
+    Map<String, String> metrics = new HashMap<>();
 
-        try {
-            KubernetesApiResponse<PodMetricsList> response = metricsApi.list(namespace);
+    try {
+        KubernetesApiResponse<PodMetricsList> response = metricsApi.list(namespace);
 
-            if (!response.isSuccess()) {
-                logger.error("Failed to get pod metrics: {}", response.getStatus());
-                metrics.put("error", "Failed to retrieve metrics: " + response.getStatus().getMessage());
-                return metrics;
-            }
-
-            PodMetricsList podMetricsList = response.getObject();
-            if (podMetricsList != null && podMetricsList.getItems() != null) {
-                for (PodMetrics podMetrics : podMetricsList.getItems()) {
-                    if (podMetrics.getMetadata() != null &&
-                        podName.equals(podMetrics.getMetadata().getName())) {
-
-                        if (podMetrics.getContainers() != null && !podMetrics.getContainers().isEmpty()) {
-                            ContainerMetrics container = podMetrics.getContainers().get(0);
-                            if (container.getUsage() != null) {
-                                String cpu = container.getUsage().get("cpu");
-                                String memory = container.getUsage().get("memory");
-
-                                if (cpu != null) metrics.put("cpu", cpu);
-                                if (memory != null) metrics.put("memory", memory);
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
-
-            if (!metrics.containsKey("cpu") || !metrics.containsKey("memory")) {
-                metrics.put("error", "Metrics not found for pod " + podName);
-            }
-
-        } catch (ApiException e) {
-            logger.error("API error retrieving metrics for pod {}/{}: {}", namespace, podName, e.getResponseBody(), e);
-            metrics.put("error", "API error: " + e.getMessage());
-        } catch (Exception e) {
-            logger.error("Unexpected error retrieving metrics for pod {}/{}: {}", namespace, podName, e.getMessage(), e);
-            metrics.put("error", "Unexpected error: " + e.getMessage());
+        if (!response.isSuccess()) {
+            logger.error("Failed to get pod metrics: {}", response.getStatus());
+            metrics.put("error", "Failed to retrieve metrics: " + response.getStatus().getMessage());
+            return metrics;
         }
 
-        return metrics;
+        PodMetricsList podMetricsList = response.getObject();
+        if (podMetricsList != null && podMetricsList.getItems() != null) {
+            for (PodMetrics podMetrics : podMetricsList.getItems()) {
+                if (podMetrics.getMetadata() != null &&
+                    podName.equals(podMetrics.getMetadata().getName())) {
+
+                    if (podMetrics.getContainers() != null && !podMetrics.getContainers().isEmpty()) {
+                        ContainerMetrics container = podMetrics.getContainers().get(0);
+                        if (container.getUsage() != null) {
+                            String cpu = container.getUsage().get("cpu");
+                            String memory = container.getUsage().get("memory");
+
+                            if (cpu != null) metrics.put("cpu", cpu);
+                            if (memory != null) metrics.put("memory", memory);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (!metrics.containsKey("cpu") || !metrics.containsKey("memory")) {
+            metrics.put("error", "Metrics not found for pod " + podName);
+        }
+
+    } catch (Exception e) {
+        logger.error("Unexpected error retrieving metrics for pod {}/{}: {}", namespace, podName, e.getMessage(), e);
+        metrics.put("error", "Unexpected error: " + e.getMessage());
     }
+
+    return metrics;
+}
+
 
     // === Inner classes ===
 
