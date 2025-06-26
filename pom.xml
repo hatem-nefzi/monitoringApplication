@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.0</version> <!-- Updated to latest 3.3.x version -->
+        <version>3.5.0</version>
         <relativePath/>
     </parent>
 
@@ -20,20 +20,12 @@
     <properties>
         <java.version>17</java.version>
         <kubernetes-client.version>18.0.0</kubernetes-client.version>
-        <!-- Force newer versions to address security vulnerabilities -->
         <snakeyaml.version>2.0</snakeyaml.version>
         <tomcat.version>10.1.42</tomcat.version>
     </properties>
 
     <dependencies>
-        <dependency>
-            <groupId>io.kubernetes</groupId>
-            <artifactId>client-java</artifactId>
-            <version>${kubernetes-client.version}</version>
-        </dependency>
-
-        
-        <!-- Spring Boot Starters -->
+        <!-- Spring Boot -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -42,46 +34,44 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
-        
-        <!-- Kubernetes Client -->
+
+        <!-- Kubernetes Java Client -->
         <dependency>
             <groupId>io.kubernetes</groupId>
             <artifactId>client-java</artifactId>
             <version>${kubernetes-client.version}</version>
-            <scope>compile</scope>
         </dependency>
-        
-        <!-- Metrics API Dependencies -->
         <dependency>
             <groupId>io.kubernetes</groupId>
             <artifactId>client-java-api</artifactId>
-            <version>18.0.0</version>
+            <version>${kubernetes-client.version}</version>
         </dependency>
         <dependency>
             <groupId>io.kubernetes</groupId>
             <artifactId>client-java-api-fluent</artifactId>
-            <version>18.0.0</version>
+            <version>${kubernetes-client.version}</version>
         </dependency>
         <dependency>
             <groupId>io.kubernetes</groupId>
-            <artifactId>client-java-metrics</artifactId>
-            <version>18.0.0</version>
+            <artifactId>client-java-extended</artifactId>
+            <version>${kubernetes-client.version}</version>
         </dependency>
 
-        
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
-        
+
         <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Commons IO -->
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
@@ -89,17 +79,16 @@
         </dependency>
     </dependencies>
 
-    <!-- Dependency Management to override vulnerable versions -->
     <dependencyManagement>
         <dependencies>
-            <!-- Override SnakeYAML to fix CVE-2022-1471 -->
+            <!-- SnakeYAML CVE Fix -->
             <dependency>
                 <groupId>org.yaml</groupId>
                 <artifactId>snakeyaml</artifactId>
                 <version>${snakeyaml.version}</version>
             </dependency>
-            
-            <!-- Override Tomcat versions to fix multiple CVEs -->
+
+            <!-- Tomcat CVE Fixes -->
             <dependency>
                 <groupId>org.apache.tomcat.embed</groupId>
                 <artifactId>tomcat-embed-core</artifactId>
@@ -115,17 +104,19 @@
                 <artifactId>tomcat-embed-el</artifactId>
                 <version>${tomcat.version}</version>
             </dependency>
-            <!--added to solve container scan issues -->
+
+            <!-- Protobuf CVE Fix -->
             <dependency>
                 <groupId>com.google.protobuf</groupId>
                 <artifactId>protobuf-java</artifactId>
-                <version>3.25.5</version> <!-- LTS version -->
+                <version>3.25.5</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
 
     <build>
         <plugins>
+            <!-- Spring Boot Plugin -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -138,15 +129,15 @@
                     </excludes>
                 </configuration>
             </plugin>
-            
-            <!-- SonarQube Plugin -->
+
+            <!-- SonarQube -->
             <plugin>
                 <groupId>org.sonarsource.scanner.maven</groupId>
                 <artifactId>sonar-maven-plugin</artifactId>
                 <version>4.0.0.4121</version>
             </plugin>
-            
-            <!-- OWASP Dependency Check Plugin -->
+
+            <!-- OWASP Dependency Check -->
             <plugin>
                 <groupId>org.owasp</groupId>
                 <artifactId>dependency-check-maven</artifactId>
