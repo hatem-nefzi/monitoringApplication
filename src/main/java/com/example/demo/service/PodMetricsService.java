@@ -2,12 +2,12 @@ package com.example.demo.service;
 
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.models.V1ListMeta;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.util.generic.GenericKubernetesApi;
 import io.kubernetes.client.util.generic.KubernetesApiResponse;
 import io.kubernetes.client.common.KubernetesObject;
 import io.kubernetes.client.common.KubernetesListObject;
-import io.kubernetes.client.common.KubernetesListObjectMeta;
-import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import com.google.gson.annotations.SerializedName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,11 +91,21 @@ public class PodMetricsService {
         private List<ContainerMetrics> containers;
 
         @Override
-        public V1ObjectMeta getMetadata() { return metadata; }
-        public void setMetadata(V1ObjectMeta metadata) { this.metadata = metadata; }
+        public V1ObjectMeta getMetadata() {
+            return metadata;
+        }
 
-        public List<ContainerMetrics> getContainers() { return containers; }
-        public void setContainers(List<ContainerMetrics> containers) { this.containers = containers; }
+        public void setMetadata(V1ObjectMeta metadata) {
+            this.metadata = metadata;
+        }
+
+        public List<ContainerMetrics> getContainers() {
+            return containers;
+        }
+
+        public void setContainers(List<ContainerMetrics> containers) {
+            this.containers = containers;
+        }
     }
 
     public static class PodMetricsList implements KubernetesListObject {
@@ -103,15 +113,25 @@ public class PodMetricsService {
         private List<PodMetrics> items;
 
         @SerializedName("metadata")
-        private KubernetesListObjectMeta metadata;
+        private V1ListMeta metadata;
 
         @Override
-        public List<PodMetrics> getItems() { return items; }
-        public void setItems(List<PodMetrics> items) { this.items = items; }
+        public List<PodMetrics> getItems() {
+            return items;
+        }
+
+        public void setItems(List<PodMetrics> items) {
+            this.items = items;
+        }
 
         @Override
-        public KubernetesListObjectMeta getMetadata() { return metadata; }
-        public void setMetadata(KubernetesListObjectMeta metadata) { this.metadata = metadata; }
+        public V1ListMeta getMetadata() {
+            return metadata;
+        }
+
+        public void setMetadata(V1ListMeta metadata) {
+            this.metadata = metadata;
+        }
     }
 
     public static class ContainerMetrics {
@@ -121,10 +141,20 @@ public class PodMetricsService {
         @SerializedName("usage")
         private Map<String, String> usage;
 
-        public String getName() { return name; }
-        public void setName(String name) { this.name = name; }
+        public String getName() {
+            return name;
+        }
 
-        public Map<String, String> getUsage() { return usage; }
-        public void setUsage(Map<String, String> usage) { this.usage = usage; }
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public Map<String, String> getUsage() {
+            return usage;
+        }
+
+        public void setUsage(Map<String, String> usage) {
+            this.usage = usage;
+        }
     }
 }
