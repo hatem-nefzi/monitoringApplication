@@ -3,6 +3,8 @@ kind: Kustomization
 namespace: staging
 resources:
   - ../../base
+  - rbac/role.yaml
+  - rbac/rolebinding.yaml
 patches:
   - path: patches/deployment-patch.yaml
 images:
