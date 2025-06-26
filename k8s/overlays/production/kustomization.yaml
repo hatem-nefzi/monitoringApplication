@@ -11,7 +11,10 @@ patchesStrategicMerge:
 
 images:
   - name: monitoring-backend
-    newName: hatemnefzi/monitoring-backend
+    newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
+    newTag: latest
+
+
 
 commonLabels:
   environment: production
@@ -22,3 +25,4 @@ configMapGenerator:
     literals:
       - LOG_LEVEL=WARN
       - ENVIRONMENT=production
+      - SERVER_PORT=9090
