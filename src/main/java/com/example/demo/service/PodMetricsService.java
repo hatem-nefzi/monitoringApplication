@@ -4,6 +4,10 @@ import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.util.generic.GenericKubernetesApi;
 import io.kubernetes.client.util.generic.KubernetesApiResponse;
+import io.kubernetes.client.common.KubernetesObject;
+import io.kubernetes.client.common.KubernetesListObject;
+import io.kubernetes.client.common.KubernetesListObjectMeta;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import com.google.gson.annotations.SerializedName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +20,7 @@ import java.util.Map;
 @Service
 public class PodMetricsService {
     private static final Logger logger = LoggerFactory.getLogger(PodMetricsService.class);
-    
+
     private final GenericKubernetesApi<PodMetrics, PodMetricsList> metricsApi;
 
     public PodMetricsService(ApiClient apiClient) {
@@ -32,10 +36,10 @@ public class PodMetricsService {
 
     public Map<String, String> getPodMetrics(String namespace, String podName) {
         Map<String, String> metrics = new HashMap<>();
-        
+
         try {
             KubernetesApiResponse<PodMetricsList> response = metricsApi.list(namespace);
-            
+
             if (!response.isSuccess()) {
                 logger.error("Failed to get pod metrics: {}", response.getStatus());
                 metrics.put("error", "Failed to retrieve metrics: " + response.getStatus().getMessage());
@@ -45,15 +49,15 @@ public class PodMetricsService {
             PodMetricsList podMetricsList = response.getObject();
             if (podMetricsList != null && podMetricsList.getItems() != null) {
                 for (PodMetrics podMetrics : podMetricsList.getItems()) {
-                    if (podMetrics.getMetadata() != null && 
+                    if (podMetrics.getMetadata() != null &&
                         podName.equals(podMetrics.getMetadata().getName())) {
-                        
+
                         if (podMetrics.getContainers() != null && !podMetrics.getContainers().isEmpty()) {
                             ContainerMetrics container = podMetrics.getContainers().get(0);
                             if (container.getUsage() != null) {
                                 String cpu = container.getUsage().get("cpu");
                                 String memory = container.getUsage().get("memory");
-                                
+
                                 if (cpu != null) metrics.put("cpu", cpu);
                                 if (memory != null) metrics.put("memory", memory);
                             }
@@ -62,11 +66,11 @@ public class PodMetricsService {
                     }
                 }
             }
-            
+
             if (!metrics.containsKey("cpu") || !metrics.containsKey("memory")) {
                 metrics.put("error", "Metrics not found for pod " + podName);
             }
-            
+
         } catch (ApiException e) {
             logger.error("API error retrieving metrics for pod {}/{}: {}", namespace, podName, e.getResponseBody(), e);
             metrics.put("error", "API error: " + e.getMessage());
@@ -74,58 +78,53 @@ public class PodMetricsService {
             logger.error("Unexpected error retrieving metrics for pod {}/{}: {}", namespace, podName, e.getMessage(), e);
             metrics.put("error", "Unexpected error: " + e.getMessage());
         }
-        
+
         return metrics;
     }
 
     // Custom classes to represent the metrics API objects
-    public static class PodMetrics {
+    public static class PodMetrics implements KubernetesObject {
         @SerializedName("metadata")
-        private ObjectMeta metadata;
-        
+        private V1ObjectMeta metadata;
+
         @SerializedName("containers")
         private List<ContainerMetrics> containers;
 
-        public ObjectMeta getMetadata() { return metadata; }
-        public void setMetadata(ObjectMeta metadata) { this.metadata = metadata; }
-        
+        @Override
+        public V1ObjectMeta getMetadata() { return metadata; }
+        public void setMetadata(V1ObjectMeta metadata) { this.metadata = metadata; }
+
         public List<ContainerMetrics> getContainers() { return containers; }
         public void setContainers(List<ContainerMetrics> containers) { this.containers = containers; }
     }
 
-    public static class PodMetricsList {
+    public static class PodMetricsList implements KubernetesListObject {
         @SerializedName("items")
         private List<PodMetrics> items;
 
+        @SerializedName("metadata")
+        private KubernetesListObjectMeta metadata;
+
+        @Override
         public List<PodMetrics> getItems() { return items; }
         public void setItems(List<PodMetrics> items) { this.items = items; }
+
+        @Override
+        public KubernetesListObjectMeta getMetadata() { return metadata; }
+        public void setMetadata(KubernetesListObjectMeta metadata) { this.metadata = metadata; }
     }
 
     public static class ContainerMetrics {
         @SerializedName("name")
         private String name;
-        
+
         @SerializedName("usage")
         private Map<String, String> usage;
 
         public String getName() { return name; }
         public void setName(String name) { this.name = name; }
-        
+
         public Map<String, String> getUsage() { return usage; }
         public void setUsage(Map<String, String> usage) { this.usage = usage; }
-    }
-
-    public static class ObjectMeta {
-        @SerializedName("name")
-        private String name;
-        
-        @SerializedName("namespace")
-        private String namespace;
-
-        public String getName() { return name; }
-        public void setName(String name) { this.name = name; }
-        
-        public String getNamespace() { return namespace; }
-        public void setNamespace(String namespace) { this.namespace = namespace; }
     }
 }
