@@ -26,6 +26,9 @@ public class KubernetesController {
 
     @Autowired
     private KubernetesService kubernetesService;
+    @Value("${kubernetes.namespace:default}")
+    private String namespace;
+
 
     @GetMapping("/pod-names")
     public Map<String, Object> getPodNames() {
@@ -43,7 +46,7 @@ public class KubernetesController {
         }
     }
 
-    @Value("${kubernetes.namespace:default}")
+    
     @GetMapping("/pods")
     public ResponseEntity<?> getPods() {
         try {
