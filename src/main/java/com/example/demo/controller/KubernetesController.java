@@ -41,10 +41,11 @@ public class KubernetesController {
         }
     }
 
+    @Value("${kubernetes.namespace:default}")
     @GetMapping("/pods")
     public ResponseEntity<?> getPods() {
         try {
-            List<PodInfo> pods = kubernetesService.getPodInfo(null);
+            List<PodInfo> pods = kubernetesService.getPodInfo(namespace);
             logger.debug("Successfully fetched {} pods", pods.size());
             return ResponseEntity.ok(Map.of(
                 "success", true,
