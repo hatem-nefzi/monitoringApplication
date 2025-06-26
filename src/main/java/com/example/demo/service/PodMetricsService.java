@@ -1,62 +1,57 @@
 package com.example.demo.service;
 
-import org.springframework.stereotype.Service;
-
-import java.io.BufferedReader;
-
-import java.io.InputStreamReader;
-import java.util.HashMap;
-import java.util.Map;
+import io.kubernetes.client.custom.Quantity;
+import io.kubernetes.client.openapi.ApiClient;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.apis.MetricsApi;
+import io.kubernetes.client.openapi.models.V1beta1PodMetrics;
+import io.kubernetes.client.openapi.models.V1beta1PodMetricsList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class PodMetricsService {
     private static final Logger logger = LoggerFactory.getLogger(PodMetricsService.class);
 
+    private final MetricsApi metricsApi;
+
+    public PodMetricsService(ApiClient apiClient) {
+        this.metricsApi = new MetricsApi(apiClient);
+    }
+
     public Map<String, String> getPodMetrics(String namespace, String podName) {
         Map<String, String> metrics = new HashMap<>();
-        
+
         try {
-            // Execute kubectl top command
-            Process process = Runtime.getRuntime().exec(
-                new String[] {
-                    "kubectl", "top", "pod", podName,
-                    "--namespace", namespace,
-                    "--no-headers"
-                });
-            
-            // Read the output
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()))) {
-                
-                String line = reader.readLine();
-                if (line != null) {
-                    // Sample output: "pod-name 100m 50Mi"
-                    String[] parts = line.trim().split("\\s+");
-                    if (parts.length >= 3) {
-                        metrics.put("cpu", parts[1]);
-                        metrics.put("memory", parts[2]);
-                    }
+            V1beta1PodMetricsList podMetricsList = metricsApi.getNamespacedPodMetrics(namespace, null, null, null);
+
+            for (V1beta1PodMetrics podMetrics : podMetricsList.getItems()) {
+                if (podMetrics.getMetadata().getName().equals(podName)) {
+                    Quantity cpu = podMetrics.getContainers().get(0).getUsage().get("cpu");
+                    Quantity memory = podMetrics.getContainers().get(0).getUsage().get("memory");
+
+                    if (cpu != null) metrics.put("cpu", cpu.toSuffixedString());
+                    if (memory != null) metrics.put("memory", memory.toSuffixedString());
+                    break;
                 }
             }
-            
-            // Check for errors
-            if (process.waitFor() != 0) {
-                try (BufferedReader errorReader = new BufferedReader(
-                        new InputStreamReader(process.getErrorStream()))) {
-                    String error = errorReader.lines().collect(Collectors.joining("\n"));
-                    metrics.put("error", error);
-                    logger.error("Metrics error: {}", error);
-                }
+
+            if (!metrics.containsKey("cpu") || !metrics.containsKey("memory")) {
+                metrics.put("error", "Metrics not found for pod " + podName);
             }
-            
+
+        } catch (ApiException e) {
+            logger.error("API error retrieving metrics for pod {}/{}: {}", namespace, podName, e.getResponseBody(), e);
+            metrics.put("error", "API error: " + e.getMessage());
         } catch (Exception e) {
-            logger.error("Failed to get metrics for pod {}/{}: {}", namespace, podName, e.getMessage());
-            metrics.put("error", "Metrics collection failed: " + e.getMessage());
+            logger.error("Unexpected error retrieving metrics for pod {}/{}: {}", namespace, podName, e.getMessage(), e);
+            metrics.put("error", "Unexpected error: " + e.getMessage());
         }
-        
+
         return metrics;
     }
 }
