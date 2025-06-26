@@ -538,7 +538,7 @@ monitoring_staging_smoke_tests:
     # Wait for HTTP server to be ready inside the pod
     - echo "Waiting for HTTP server to be ready inside the pod..."
     - |
-      for i in $(seq 1 30); do
+      for i in $(seq 1 70); do
         if kubectl exec $POD_NAME -n ${ENVIRONMENT} -- sh -c "curl -sf --max-time 5 http://localhost:9090/actuator/health" >/dev/null 2>&1; then
           echo "✅ HTTP server is ready inside the pod"
           break
