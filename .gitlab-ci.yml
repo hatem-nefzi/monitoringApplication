@@ -531,9 +531,27 @@ monitoring_staging_smoke_tests:
     - echo "=== SERVICE CONFIGURATION ==="
     - kubectl get service -n ${ENVIRONMENT} -l app=monitoring-backend -o yaml || true
 
-    # Wait for application to be fully started (Spring Boot can take time)
-    - echo "Waiting additional time for Spring Boot application to fully start..."
-    - sleep 30
+    # Wait for Spring Boot application to be fully started
+    - echo "Waiting for Spring Boot application to fully start..."
+    - |
+      for i in $(seq 1 60); do
+        if kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=5 | grep -q "Started.*Application.*in.*seconds"; then
+          echo "✅ Spring Boot application has started"
+          break
+        else
+          echo "Waiting for Spring Boot to start... ($i/60)"
+          sleep 5
+        fi
+        if [ $i -eq 60 ]; then
+          echo "❌ Spring Boot application didn't start within 5 minutes"
+          kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=20
+          exit 1
+        fi
+      done
+
+    # Additional wait to ensure all endpoints are registered
+    - echo "Waiting additional 15 seconds for endpoints to be fully registered..."
+    - sleep 15
 
     # Check logs again after waiting
     - echo "=== APPLICATION LOGS AFTER WAIT ==="
@@ -547,7 +565,7 @@ monitoring_staging_smoke_tests:
     
     # Wait for port-forward to establish
     - echo "Waiting for port-forward to establish..."
-    - sleep 10
+    - sleep 15
     
     # Check if port-forward is still running
     - |
@@ -583,10 +601,9 @@ monitoring_staging_smoke_tests:
       POD_IP=$(kubectl get pod $POD_NAME -n ${ENVIRONMENT} -o jsonpath='{.status.podIP}')
       echo "Pod IP: $POD_IP"
       
-      # Test if we can reach the pod directly (this might not work depending on network setup)
+      # Test if we can reach the pod directly from inside the pod
       echo "Testing direct connection to pod..."
-      kubectl exec $POD_NAME -n ${ENVIRONMENT} -- sh -c "curl -sf --max-time 5 http://localhost:9090/actuator/health" || echo "Direct connection to localhost:9090 failed"
-      kubectl exec $POD_NAME -n ${ENVIRONMENT} -- sh -c "curl -sf --max-time 5 http://127.0.0.1:9090/actuator/health" || echo "Direct connection to 127.0.0.1:9090 failed"
+      kubectl exec $POD_NAME -n ${ENVIRONMENT} -- sh -c "curl -sf --max-time 10 http://localhost:9090/actuator/health" && echo "✅ Direct connection to localhost:9090 works" || echo "❌ Direct connection to localhost:9090 failed"
 
     # Run smoke tests with better error reporting
     - |
@@ -598,11 +615,11 @@ monitoring_staging_smoke_tests:
         echo "Testing endpoint $endpoint with retry..."
         success=false
         
-        for i in $(seq 1 5); do
+        for i in $(seq 1 3); do
           echo "Attempt $i for $endpoint..."
           
           # Use verbose curl for better debugging
-          response=$(curl -sf --max-time 10 -w "HTTP_CODE:%{http_code}" http://localhost:9090$endpoint 2>&1) || true
+          response=$(curl -sf --max-time 15 -w "HTTP_CODE:%{http_code}" http://localhost:9090$endpoint 2>&1) || true
           
           if echo "$response" | grep -q "HTTP_CODE:200"; then
             echo "✅ $endpoint is OK"
@@ -619,15 +636,15 @@ monitoring_staging_smoke_tests:
               break
             fi
             
-            if [ $i -lt 5 ]; then
-              echo "Retrying in 10s..."
-              sleep 10
+            if [ $i -lt 3 ]; then
+              echo "Retrying in 15s..."
+              sleep 15
             fi
           fi
         done
         
         if [ "$success" = false ]; then
-          echo "❌ $endpoint failed after 5 attempts"
+          echo "❌ $endpoint failed after 3 attempts"
           ALL_PASSED=false
         fi
       done
