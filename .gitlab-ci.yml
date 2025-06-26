@@ -537,7 +537,7 @@ monitoring_staging_smoke_tests:
 
     # Port-forward 9090 -> localhost
     - echo "Starting port-forward..."
-    - kubectl port-forward service/monitoring-backend-service-${ENVIRONMENT} 9090:80 -n ${ENVIRONMENT} &
+    - kubectl port-forward service/monitoring-backend-service 9090:80 -n ${ENVIRONMENT} &
     - PORT_FORWARD_PID=$!
     - sleep 10
 
