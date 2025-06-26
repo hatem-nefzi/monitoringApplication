@@ -82,8 +82,15 @@ public class PodMetricsService {
         return metrics;
     }
 
-    // Custom classes to represent the metrics API objects
+    // === Inner classes ===
+
     public static class PodMetrics implements KubernetesObject {
+        @SerializedName("kind")
+        private String kind;
+
+        @SerializedName("apiVersion")
+        private String apiVersion;
+
         @SerializedName("metadata")
         private V1ObjectMeta metadata;
 
@@ -95,8 +102,26 @@ public class PodMetricsService {
             return metadata;
         }
 
+        @Override
+        public String getApiVersion() {
+            return apiVersion;
+        }
+
+        @Override
+        public String getKind() {
+            return kind;
+        }
+
         public void setMetadata(V1ObjectMeta metadata) {
             this.metadata = metadata;
+        }
+
+        public void setApiVersion(String apiVersion) {
+            this.apiVersion = apiVersion;
+        }
+
+        public void setKind(String kind) {
+            this.kind = kind;
         }
 
         public List<ContainerMetrics> getContainers() {
@@ -109,19 +134,26 @@ public class PodMetricsService {
     }
 
     public static class PodMetricsList implements KubernetesListObject {
-        @SerializedName("items")
-        private List<PodMetrics> items;
+        @SerializedName("kind")
+        private String kind;
+
+        @SerializedName("apiVersion")
+        private String apiVersion;
 
         @SerializedName("metadata")
         private V1ListMeta metadata;
 
+        @SerializedName("items")
+        private List<PodMetrics> items;
+
         @Override
-        public List<PodMetrics> getItems() {
-            return items;
+        public String getKind() {
+            return kind;
         }
 
-        public void setItems(List<PodMetrics> items) {
-            this.items = items;
+        @Override
+        public String getApiVersion() {
+            return apiVersion;
         }
 
         @Override
@@ -129,8 +161,25 @@ public class PodMetricsService {
             return metadata;
         }
 
+        @Override
+        public List<PodMetrics> getItems() {
+            return items;
+        }
+
+        public void setKind(String kind) {
+            this.kind = kind;
+        }
+
+        public void setApiVersion(String apiVersion) {
+            this.apiVersion = apiVersion;
+        }
+
         public void setMetadata(V1ListMeta metadata) {
             this.metadata = metadata;
+        }
+
+        public void setItems(List<PodMetrics> items) {
+            this.items = items;
         }
     }
 
