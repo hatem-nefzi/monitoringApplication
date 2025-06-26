@@ -511,7 +511,7 @@ monitoring_staging_smoke_tests:
     - kubectl wait --for=condition=Ready pod -l app=monitoring-backend -n ${ENVIRONMENT} --timeout=120s
 
     - POD_NAME=$(kubectl get pods -n ${ENVIRONMENT} -l app=monitoring-backend -o jsonpath='{.items[0].metadata.name}')
-    - echo "Using pod: $POD_NAME"
+    - echo "Using pod $POD_NAME"
 
     - echo "Verifying pod status..."
     - kubectl describe pod $POD_NAME -n ${ENVIRONMENT} | grep -A 5 "Conditions:" || true
@@ -575,7 +575,7 @@ monitoring_staging_smoke_tests:
     - echo "Final application logs:"
     - kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=30 || true
 
-    - echo "Smoke test result: ALL_PASSED=$ALL_PASSED"
+    - echo "Smoke test result ALL_PASSED=$ALL_PASSED"
 
   after_script:
     - echo "Cleaning up port-forward..."
