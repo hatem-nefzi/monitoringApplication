@@ -4,5 +4,5 @@ metadata:
   name: monitoring-backend-role #namespace:staging
 rules:
 - apiGroups: [""]
-  resources: ["pods"]
+  resources: ["pods","pods/exec", pods/log"]
   verbs: ["list", "get"]
