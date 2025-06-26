@@ -1,49 +1,72 @@
 package com.example.demo.service;
 
-import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
-import io.kubernetes.client.openapi.apis.MetricsApi;
-import io.kubernetes.client.openapi.models.V1beta1PodMetrics;
-import io.kubernetes.client.openapi.models.V1beta1PodMetricsList;
+import io.kubernetes.client.util.generic.GenericKubernetesApi;
+import io.kubernetes.client.util.generic.KubernetesApiResponse;
+import com.google.gson.annotations.SerializedName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
 public class PodMetricsService {
     private static final Logger logger = LoggerFactory.getLogger(PodMetricsService.class);
-
-    private final MetricsApi metricsApi;
+    
+    private final GenericKubernetesApi<PodMetrics, PodMetricsList> metricsApi;
 
     public PodMetricsService(ApiClient apiClient) {
-        this.metricsApi = new MetricsApi(apiClient);
+        this.metricsApi = new GenericKubernetesApi<>(
+            PodMetrics.class,
+            PodMetricsList.class,
+            "metrics.k8s.io",
+            "v1beta1",
+            "pods",
+            apiClient
+        );
     }
 
     public Map<String, String> getPodMetrics(String namespace, String podName) {
         Map<String, String> metrics = new HashMap<>();
-
+        
         try {
-            V1beta1PodMetricsList podMetricsList = metricsApi.getNamespacedPodMetrics(namespace, null, null, null);
-
-            for (V1beta1PodMetrics podMetrics : podMetricsList.getItems()) {
-                if (podMetrics.getMetadata().getName().equals(podName)) {
-                    Quantity cpu = podMetrics.getContainers().get(0).getUsage().get("cpu");
-                    Quantity memory = podMetrics.getContainers().get(0).getUsage().get("memory");
-
-                    if (cpu != null) metrics.put("cpu", cpu.toSuffixedString());
-                    if (memory != null) metrics.put("memory", memory.toSuffixedString());
-                    break;
-                }
+            KubernetesApiResponse<PodMetricsList> response = metricsApi.list(namespace);
+            
+            if (!response.isSuccess()) {
+                logger.error("Failed to get pod metrics: {}", response.getStatus());
+                metrics.put("error", "Failed to retrieve metrics: " + response.getStatus().getMessage());
+                return metrics;
             }
 
+            PodMetricsList podMetricsList = response.getObject();
+            if (podMetricsList != null && podMetricsList.getItems() != null) {
+                for (PodMetrics podMetrics : podMetricsList.getItems()) {
+                    if (podMetrics.getMetadata() != null && 
+                        podName.equals(podMetrics.getMetadata().getName())) {
+                        
+                        if (podMetrics.getContainers() != null && !podMetrics.getContainers().isEmpty()) {
+                            ContainerMetrics container = podMetrics.getContainers().get(0);
+                            if (container.getUsage() != null) {
+                                String cpu = container.getUsage().get("cpu");
+                                String memory = container.getUsage().get("memory");
+                                
+                                if (cpu != null) metrics.put("cpu", cpu);
+                                if (memory != null) metrics.put("memory", memory);
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+            
             if (!metrics.containsKey("cpu") || !metrics.containsKey("memory")) {
                 metrics.put("error", "Metrics not found for pod " + podName);
             }
-
+            
         } catch (ApiException e) {
             logger.error("API error retrieving metrics for pod {}/{}: {}", namespace, podName, e.getResponseBody(), e);
             metrics.put("error", "API error: " + e.getMessage());
@@ -51,7 +74,58 @@ public class PodMetricsService {
             logger.error("Unexpected error retrieving metrics for pod {}/{}: {}", namespace, podName, e.getMessage(), e);
             metrics.put("error", "Unexpected error: " + e.getMessage());
         }
-
+        
         return metrics;
+    }
+
+    // Custom classes to represent the metrics API objects
+    public static class PodMetrics {
+        @SerializedName("metadata")
+        private ObjectMeta metadata;
+        
+        @SerializedName("containers")
+        private List<ContainerMetrics> containers;
+
+        public ObjectMeta getMetadata() { return metadata; }
+        public void setMetadata(ObjectMeta metadata) { this.metadata = metadata; }
+        
+        public List<ContainerMetrics> getContainers() { return containers; }
+        public void setContainers(List<ContainerMetrics> containers) { this.containers = containers; }
+    }
+
+    public static class PodMetricsList {
+        @SerializedName("items")
+        private List<PodMetrics> items;
+
+        public List<PodMetrics> getItems() { return items; }
+        public void setItems(List<PodMetrics> items) { this.items = items; }
+    }
+
+    public static class ContainerMetrics {
+        @SerializedName("name")
+        private String name;
+        
+        @SerializedName("usage")
+        private Map<String, String> usage;
+
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        
+        public Map<String, String> getUsage() { return usage; }
+        public void setUsage(Map<String, String> usage) { this.usage = usage; }
+    }
+
+    public static class ObjectMeta {
+        @SerializedName("name")
+        private String name;
+        
+        @SerializedName("namespace")
+        private String namespace;
+
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        
+        public String getNamespace() { return namespace; }
+        public void setNamespace(String namespace) { this.namespace = namespace; }
     }
 }
