@@ -469,6 +469,9 @@ deploy_monitoring_backend_staging:
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
 
+
+
+    
 monitoring_staging_smoke_tests:
   <<: *kubectl_definition
   stage: staging-tests
@@ -479,12 +482,12 @@ monitoring_staging_smoke_tests:
     KUBECONFIG: "${CI_PROJECT_DIR}/.kube/config"
     HOST_IP: "172.17.0.1"
   before_script:
-    - apk add --no-cache curl jq bash procps netcat-openbsd
+    - apk add --no-cache curl jq bash procps
     - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
     - chmod +x kubectl && mv kubectl /usr/local/bin/
     - mkdir -p "$(dirname "$KUBECONFIG")"
     - |
-      cat > "$KUBECONFIG" <<EOF
+      cat > "${KUBECONFIG}" <<EOF
       apiVersion: v1
       clusters:
       - cluster:
@@ -504,101 +507,105 @@ monitoring_staging_smoke_tests:
         user: {}
       EOF
   script:
+    - echo "Running smoke tests against ${ENVIRONMENT} environment..."
+
+    # Wait until the pod is ready
     - echo "Waiting for monitoring-backend pod to be ready..."
     - kubectl wait --for=condition=Ready pod -l app=monitoring-backend -n ${ENVIRONMENT} --timeout=120s
+
+    # Get pod name
     - POD_NAME=$(kubectl get pods -n ${ENVIRONMENT} -l app=monitoring-backend -o jsonpath='{.items[0].metadata.name}')
     - echo "Using pod $POD_NAME"
 
-    # Wait until port 9090 is ready inside the pod
-    - echo "Waiting until application is listening on port 9090 inside pod..."
+    # Wait for Spring Boot application to be fully started
+    - echo "Waiting for Spring Boot application to fully start..."
     - |
-      for i in $(seq 1 30); do
-        if kubectl exec $POD_NAME -n ${ENVIRONMENT} -- nc -z localhost 9090; then
-          echo "Application is now accepting connections on port 9090"
+      for i in $(seq 1 60); do
+        if kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=5 | grep -q "Started.*Application.*in.*seconds"; then
+          echo "✅ Spring Boot application has started"
           break
         else
-          echo "Port 9090 not ready... ($i/30)"
-          sleep 2
+          echo "Waiting for Spring Boot to start... ($i/60)"
+          sleep 5
         fi
-        if [ $i -eq 30 ]; then
-          echo "Port 9090 never became ready inside the pod"
-          kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=30 || true
+        if [ $i -eq 60 ]; then
+          echo "❌ Spring Boot application didn't start within 5 minutes"
+          kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=20
           exit 1
         fi
       done
 
-    # Start port-forwarding
-    - echo "Starting port-forward..."
-    - kubectl port-forward pod/$POD_NAME 9090:9090 -n ${ENVIRONMENT} > /tmp/port-forward.log 2>&1 &
-    - PORT_FORWARD_PID=$!
-    - sleep 15
-    - if ! kill -0 $PORT_FORWARD_PID 2>/dev/null; then echo "Port-forward process died"; cat /tmp/port-forward.log || true; exit 1; fi
-
-    # Verify port is listening on host
-    - echo "Verifying port 9090 availability on host..."
+    # Wait for HTTP server to be ready inside the pod
+    - echo "Waiting for HTTP server to be ready inside the pod..."
     - |
       for i in $(seq 1 30); do
-        if netstat -ln 2>/dev/null | grep :9090 || ss -ln 2>/dev/null | grep :9090; then
-          echo "Port 9090 is listening"
+        if kubectl exec $POD_NAME -n ${ENVIRONMENT} -- sh -c "curl -sf --max-time 5 http://localhost:9090/actuator/health" >/dev/null 2>&1; then
+          echo "✅ HTTP server is ready inside the pod"
           break
         else
-          echo "Waiting for port 9090 to be available... ($i/30)"
-          sleep 2
+          echo "Waiting for HTTP server to be ready inside pod... ($i/30)"
+          sleep 3
         fi
         if [ $i -eq 30 ]; then
-          echo "Port 9090 never became available on host"
-          cat /tmp/port-forward.log || true
+          echo "❌ HTTP server never became ready inside the pod"
+          kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=10
           exit 1
         fi
       done
 
-    # Run smoke tests
-    - echo "Running endpoint smoke tests..."
-    - ALL_PASSED=true
+    # Run smoke tests directly inside the pod (no port-forward needed!)
+    - echo "Running endpoint smoke tests directly inside the pod..."
     - |
-      for endpoint in /actuator/health /api/kubernetes/pods; do
-        echo "Testing $endpoint"
+      ALL_PASSED=true
+      endpoints="/actuator/health /api/kubernetes/pods"
+
+      for endpoint in $endpoints; do
+        echo "Testing $endpoint directly in pod"
         success=false
+        
         for i in $(seq 1 3); do
-          response=$(curl -sf --max-time 15 -w "HTTP_CODE:%{http_code}" http://localhost:9090$endpoint 2>&1) || true
-          if echo "$response" | grep -q "HTTP_CODE:200"; then
-            echo "$endpoint succeeded"
+          if kubectl exec $POD_NAME -n ${ENVIRONMENT} -- sh -c "curl -sf --max-time 15 http://localhost:9090$endpoint" >/dev/null 2>&1; then
+            echo "✅ $endpoint is OK"
             success=true
             break
           else
-            echo "Attempt $i failed for $endpoint"
-            echo "Response: $response"
+            echo "❌ Attempt $i failed for $endpoint"
             if [ $i -lt 3 ]; then
-              echo "Retrying in 10s..."
-              sleep 10
+              echo "Retrying in 5s..."
+              sleep 5
             fi
           fi
         done
+        
         if [ "$success" = false ]; then
-          echo "$endpoint failed after 3 attempts"
+          echo "❌ $endpoint failed after 3 attempts"
           ALL_PASSED=false
         fi
       done
 
-    - echo "Final port-forward logs:"
-    - cat /tmp/port-forward.log || true
-    - echo "Final application logs:"
-    - kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=30 || true
-
-  after_script:
-    - echo "Cleaning up port-forward..."
-    - |
-      if [ -n "$PORT_FORWARD_PID" ]; then
-        kill $PORT_FORWARD_PID 2>/dev/null || true
-        sleep 2
-        kill -9 $PORT_FORWARD_PID 2>/dev/null || true
-      fi
+    # Show debugging info if tests failed
     - |
       if [ "$ALL_PASSED" != "true" ]; then
-        echo "Smoke tests failed"
-        exit 1
+        echo "=== DEBUGGING INFO FOR FAILED TESTS ==="
+        echo "Application logs:"
+        kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=20 || true
+        echo "What's listening inside the pod:"
+        kubectl exec $POD_NAME -n ${ENVIRONMENT} -- sh -c "netstat -tlnp 2>/dev/null || ss -tlnp 2>/dev/null" || true
+        echo "Testing endpoints with verbose output:"
+        for endpoint in $endpoints; do
+          echo "--- Testing $endpoint ---"
+          kubectl exec $POD_NAME -n ${ENVIRONMENT} -- sh -c "curl -v --max-time 10 http://localhost:9090$endpoint" || true
+        done
+      fi
+
+    # Final result
+    - echo "Smoke test result ALL_PASSED=$ALL_PASSED"
+    - |
+      if [ "$ALL_PASSED" = "true" ]; then
+        echo "✅ All smoke tests passed!"
       else
-        echo "All smoke tests passed"
+        echo "❌ Some smoke tests failed!"
+        exit 1
       fi
 
   needs: ["deploy_monitoring_backend_staging"]
