@@ -19,7 +19,7 @@ variables:
   MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
   DOCKER_HOST: "unix:///var/run/docker.sock"
   REGISTRY_URL: "localhost:5000"
-  # For kubernetes deployment - we are going to us the host IP instead of localhost.
+  # For kubernetes deployment - we are going to us the host IP instead of localhost
   MINIKUBE_HOST_IP: "192.168.58.1"
   K8S_REGISTRY_URL: "$MINIKUBE_HOST_IP:5000" # (172.17.0.1:5000)
   REGISTRY_IMAGE: "$REGISTRY_URL/proxiad-academie/monitoring-backend"
