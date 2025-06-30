@@ -723,7 +723,7 @@ setup_monitoring:
     - echo "Waiting 30 seconds for Prometheus discovery..."
     - sleep 30
     
-    # Test Prometheus targets
+    # Test Prometheus targets.
     - |
       if TARGETS=$(curl -s "${PROMETHEUS_URL}/api/v1/targets" 2>/dev/null); then
         echo "✅ Prometheus targets query successful"
