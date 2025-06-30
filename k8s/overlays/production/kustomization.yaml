@@ -7,6 +7,8 @@ resources:
   - ../../base
   - ../../monitoring  
   - ingress.yaml
+  - rbac/role.yaml
+  - rbac/rolebinding.yaml
 
 patchesStrategicMerge:
   - patches/deployment-patch.yaml
