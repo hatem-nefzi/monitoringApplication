@@ -33,7 +33,7 @@ variables:
   KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
   HOST_IP: "172.17.0.1"  # Your Docker host IP. (172.17.0.1)
   #ensures sonarqube can access full git history
-  GIT_DEPTH: 0
+  GIT_DEPTH: 50
   # Environment-specific variables
   STAGING_NAMESPACE: "staging"
   PRODUCTION_NAMESPACE: "production"
@@ -747,7 +747,13 @@ deploy_monitoring_backend_gke:
   <<: *monitoring_gke_deploy
   stage: deploy-gke
   script:
-    - cd "$CI_PROJECT_DIR"       # Ensure you're at the root of the repo
+    - echo "Listing current directory:"
+    - pwd
+    - ls -la
+    - echo "Checking overlays:"
+    - ls -la overlays
+    - echo "Checking overlays/gke:"
+    - ls -la overlays/gke
     - echo "Building Kustomize overlay..."
     - echo "=== DEPLOYING monitoring-backend TO GKE CLUSTER ==="
     - echo "Project $GCP_PROJECT_ID"
@@ -774,6 +780,6 @@ deploy_monitoring_backend_gke:
     - echo "=== Logs (latest) ==="
     - kubectl logs -l app=monitoring-backend -n "$GKE_NAMESPACE" --tail=100
   rules:
-    - if: $CI_COMMIT_BRANCH == "experiment" || $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "experiment"
 
 
