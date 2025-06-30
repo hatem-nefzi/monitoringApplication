@@ -715,7 +715,7 @@ setup_monitoring:
     - echo "Monitoring resources are deployed with main application via Kustomize"
     - echo "Verifying monitoring setup..."
     
-    # Verify monitoring resources
+    # Verify monitoring resources.
     - kubectl get servicemonitor -n ${ENVIRONMENT} || echo "No ServiceMonitors found"
     - kubectl get configmap -n monitoring -l grafana_dashboard=1 || echo "No Grafana dashboards found"
     
