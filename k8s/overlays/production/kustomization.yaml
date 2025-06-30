@@ -5,7 +5,8 @@ namespace: production
 
 resources:
   - ../../base
-  - ../../monitoring  # 👈 ADD: Include monitoring resources
+  - ../../monitoring  
+  - ../../ingress/production-ingress.yaml
 
 patchesStrategicMerge:
   - patches/deployment-patch.yaml
