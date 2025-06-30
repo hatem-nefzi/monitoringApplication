@@ -17,7 +17,6 @@ spec:
           limits:
             memory: "384Mi"
             cpu: "200m"
-        # Fixed env section - only use 'value' OR 'valueFrom', never both
         env:
         - name: SPRING_PROFILES_ACTIVE
           value: "staging"
@@ -33,3 +32,7 @@ spec:
             configMapKeyRef:
               name: monitoring-backend-config
               key: ENVIRONMENT
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
