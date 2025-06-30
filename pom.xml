@@ -77,6 +77,11 @@
             <artifactId>commons-io</artifactId>
             <version>2.14.0</version>
         </dependency>
+         <!--prometheus-->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
     </dependencies>
 
     <dependencyManagement>
@@ -111,11 +116,7 @@
                 <artifactId>protobuf-java</artifactId>
                 <version>3.25.5</version>
             </dependency>
-            <!--prometheus-->
-            <dependency>
-                <groupId>io.micrometer</groupId>
-                <artifactId>micrometer-registry-prometheus</artifactId>
-            </dependency>
+           
 
         </dependencies>
     </dependencyManagement>
