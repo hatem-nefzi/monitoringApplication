@@ -5,13 +5,17 @@ namespace: monitoring-backend
 
 resources:
   - ../../base
+  - rbac/service-account.yaml
+  - rbac/role.yaml
+  - rbac/rolebinding.yaml
 
 patchesStrategicMerge:
   - patches/deployment-patch.yaml
 
 images:
   - name: monitoring-backend
-    newName: hatemnefzi/monitoring-backend
+    newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
+    newTag: latest
 
 commonLabels:
   environment: gke
