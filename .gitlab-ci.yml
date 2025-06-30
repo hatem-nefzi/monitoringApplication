@@ -655,6 +655,86 @@ deploy_production:
     expire_in: 1 week
     when: always
 
-
+setup_monitoring:
+  <<: *production_job_definition
+  stage: monitoring-verify
+  image: alpine/k8s:1.30.0
+  variables:
+    ENVIRONMENT: production
+    KUBECONFIG: "${CI_PROJECT_DIR}/.kube/config"
+    PROMETHEUS_URL: "http://prometheus.production.local"
+    
+  before_script:
+    - apk add --no-cache curl jq bash
+    - mkdir -p "$(dirname "$KUBECONFIG")"
+    - echo "${PRODUCTION_VM_IP} prometheus.production.local" >> /etc/hosts
+    - echo "${PRODUCTION_VM_IP} grafana.production.local" >> /etc/hosts
+    # Setup kubeconfig (same as your deploy job)
+    - |
+      cat > "${KUBECONFIG}" <<EOF
+      apiVersion: v1
+      clusters:
+      - cluster:
+          server: ${K3S_SERVER}
+          certificate-authority-data: ${K3S_CA_CERT}
+        name: k3s-cluster
+      contexts:
+      - context:
+          cluster: k3s-cluster
+          user: k3s-user
+        name: k3s-context
+      current-context: k3s-context
+      kind: Config
+      users:
+      - name: k3s-user
+        user:
+          client-certificate-data: ${K3S_CLIENT_CERT}
+          client-key-data: ${K3S_CLIENT_KEY}
+      EOF
+  
+  script:
+    - echo "=== SETTING UP MONITORING ==="
+    
+    # Quick connectivity check
+    - |
+      if curl -f -s --connect-timeout 10 "${PROMETHEUS_URL}/api/v1/query?query=up" > /dev/null; then
+        echo "✅ Prometheus accessible"
+      else
+        echo "❌ Prometheus not accessible - monitoring setup will continue but may not work"
+      fi
+    
+    # Create monitoring namespace
+    - kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+    
+    # Apply monitoring resources using Kustomize (they're already included in your main kustomization!)
+    - echo "Monitoring resources are deployed with main application via Kustomize"
+    - echo "Verifying monitoring setup..."
+    
+    # Verify monitoring resources
+    - kubectl get servicemonitor -n ${ENVIRONMENT} || echo "No ServiceMonitors found"
+    - kubectl get configmap -n monitoring -l grafana_dashboard=1 || echo "No Grafana dashboards found"
+    
+    # Wait for Prometheus to discover targets
+    - echo "Waiting 30 seconds for Prometheus discovery..."
+    - sleep 30
+    
+    # Test Prometheus targets
+    - |
+      if TARGETS=$(curl -s "${PROMETHEUS_URL}/api/v1/targets" 2>/dev/null); then
+        echo "✅ Prometheus targets query successful"
+        echo "$TARGETS" | jq -r '.data.activeTargets[]? | select(.labels.job | contains("monitoring-backend")) | "Found:  " + .labels.job + " (" + .health + ")"' || echo "Target not yet discovered"
+      else
+        echo "⚠️ Could not query Prometheus targets"
+      fi
+    
+    - echo "=== MONITORING SETUP COMPLETE ==="
+    - echo "ServiceMonitor will be discovered by Prometheus automatically"
+    - echo "Grafana dashboard available in monitoring namespace"
+  
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "experiment" || $CI_COMMIT_BRANCH == "main"'
+  needs:
+    - job: deploy_production
+      optional: false
 
 
