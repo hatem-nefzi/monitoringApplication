@@ -626,7 +626,7 @@ deploy_production:
         --docker-password=$GITLAB_REGISTRY_PASSWORD \
         -n ${ENVIRONMENT} \
         --dry-run=client -o yaml | kubectl apply -f -
-    # Install Kustomize
+    # Install Kustomize.
     - curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
     - mv kustomize /usr/local/bin/
     - kustomize version
