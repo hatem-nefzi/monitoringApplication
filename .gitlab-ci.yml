@@ -747,6 +747,8 @@ deploy_monitoring_backend_gke:
   <<: *monitoring_gke_deploy
   stage: deploy-gke
   script:
+    - cd "$CI_PROJECT_DIR"       # Ensure you're at the root of the repo
+    - echo "Building Kustomize overlay..."
     - echo "=== DEPLOYING monitoring-backend TO GKE CLUSTER ==="
     - echo "Project $GCP_PROJECT_ID"
     - echo "Cluster $GKE_CLUSTER_NAME"
