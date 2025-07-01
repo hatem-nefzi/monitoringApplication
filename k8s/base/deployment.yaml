@@ -15,21 +15,24 @@ spec:
         app: monitoring-backend
     spec:
       imagePullSecrets:
-      - name: gitlab-registry-secret
+        - name: gitlab-registry-secret
       containers:
-      - name: monitoring-backend
-        image: monitoring-backend
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 9090
-        # Clean env section - no conflicting value/valueFrom
-        env:
-        - name: SERVER_PORT
-          value: "9090"
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "100m"
-          limits:
-            memory: "512Mi"
-            cpu: "200m"
+        - name: monitoring-backend
+          image: monitoring-backend
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9090
+          env:
+            - name: SERVER_PORT
+              value: "9090"
+            - name: KUBERNETES_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "200m"
