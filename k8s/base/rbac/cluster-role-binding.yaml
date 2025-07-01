@@ -6,7 +6,7 @@ subjects:
 - kind: ServiceAccount
   name: monitoring-backend
   namespace: PLACEHOLDER_NAMESPACE # WILL BE REPLACED
-  roleRef:
+roleRef:
   kind: ClusterRole
   name: monitoring-backend-role
   apiGroup: rbac.authorization.k8s.io
