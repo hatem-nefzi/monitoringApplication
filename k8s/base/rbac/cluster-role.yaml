@@ -1,8 +1,14 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: monitoring-backend-role #namespace:staging
+  name: monitoring-backend-role
 rules:
 - apiGroups: [""]
-  resources: ["pods","pods/exec", pods/log"]
-  verbs: ["list", "get"]
+  resources: ["pods", "pods/exec", "pods/log", "services"]
+  verbs: ["get", "list"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list"]

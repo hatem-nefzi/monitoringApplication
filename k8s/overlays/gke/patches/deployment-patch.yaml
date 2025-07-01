@@ -4,7 +4,13 @@ metadata:
   name: monitoring-backend
 spec:
   replicas: 3
+  selector:
+    matchLabels:
+      app: monitoring-backend
   template:
+    metadata:
+      labels:
+        app: monitoring-backend
     spec:
       serviceAccountName: monitoring-backend
       containers:
@@ -23,7 +29,7 @@ spec:
           requests:
             memory: "256Mi"
             cpu: "100m"
-    tolerations:
+      tolerations:
       - key: "cloud.google.com/gke-spot"
         operator: "Equal"
         value: "true"
