@@ -5,11 +5,11 @@ namespace: monitoring-backend
 
 resources:
   - ../../base
-  - rbac/role.yaml
-  - rbac/rolebinding.yaml
+  
 
 patchesStrategicMerge:
   - patches/deployment-patch.yaml
+  - patches/cluster-rolebinding-patch.yaml
 
 images:
   - name: monitoring-backend
