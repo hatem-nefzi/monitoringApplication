@@ -11,6 +11,7 @@ spec:
       maxUnavailable: 0
   template:
     spec:
+      serviceAccountName: monitoring-backend  
       containers:
       - name: monitoring-backend
         env:
