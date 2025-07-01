@@ -776,6 +776,8 @@ deploy_monitoring_backend_gke:
         --dry-run=client -o yaml | kubectl apply -f -
 
     # Kustomize build and apply
+    - echo "Patching image with SHA $CI_COMMIT_SHORT_SHA"
+    - kustomize edit set image monitoring-backend=registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring:$CI_COMMIT_SHORT_SHA
     - echo "Building Kustomize overlay..."
     - kustomize build k8s/overlays/gke | tee kustomize-output.yaml | kubectl apply -f -
 
