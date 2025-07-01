@@ -23,10 +23,10 @@ spec:
           requests:
             memory: "512Mi"
             cpu: "400m"
-      nodeSelector:
-        cloud.google.com/gke-preemptible: "true"
-      tolerations:
-      - key: "cloud.google.com/gke-preemptible"
-        operator: "Equal"
-        value: "true"
-        effect: "NoSchedule"
+      #nodeSelector:
+       # cloud.google.com/gke-preemptible: "true"
+      #tolerations:
+      #- key: "cloud.google.com/gke-preemptible"
+       # operator: "Equal"
+       # value: "true"
+        #effect: "NoSchedule"
