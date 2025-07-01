@@ -754,7 +754,6 @@ deploy_monitoring_backend_gke:
     - ls -la k8s/overlays
     - echo "Checking overlays/gke:"
     - ls -la k8s/overlays/gke
-    - echo "Building Kustomize overlay..."
     - echo "=== DEPLOYING monitoring-backend TO GKE CLUSTER ==="
     - echo "Project $GCP_PROJECT_ID"
     - echo "Cluster $GKE_CLUSTER_NAME"
@@ -775,9 +774,13 @@ deploy_monitoring_backend_gke:
         -n ${GKE_NAMESPACE} \
         --dry-run=client -o yaml | kubectl apply -f -
 
-    # Kustomize build and apply
+    # Patch image tag with commit SHA
     - echo "Patching image with SHA $CI_COMMIT_SHORT_SHA"
+    - cd k8s/overlays/gke
     - kustomize edit set image monitoring-backend=registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring:$CI_COMMIT_SHORT_SHA
+    - cd -
+
+    # Kustomize build and apply
     - echo "Building Kustomize overlay..."
     - kustomize build k8s/overlays/gke | tee kustomize-output.yaml | kubectl apply -f -
 
@@ -795,6 +798,7 @@ deploy_monitoring_backend_gke:
 
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
+
 
 
 
