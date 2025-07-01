@@ -5,7 +5,6 @@ namespace: monitoring-backend
 
 resources:
   - ../../base
-  - rbac/service-account.yaml
   - rbac/role.yaml
   - rbac/rolebinding.yaml
 
