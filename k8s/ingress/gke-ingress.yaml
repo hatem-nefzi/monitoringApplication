@@ -4,26 +4,23 @@ metadata:
   name: monitoring-backend-ingress
   namespace: monitoring-backend
   annotations:
-    kubernetes.io/ingress.global-static-ip-name: "monitoring-backend-ip"  # GCP static IP
-    networking.gke.io/managed-certificates: "monitoring-backend-ssl-cert"  # reference to ManagedCertificate (not a secret!)
+    kubernetes.io/ingress.global-static-ip-name: "monitoring-backend-ip"
+    networking.gke.io/managed-certificates: "monitoring-backend-ssl-cert"
     kubernetes.io/ingress.allow-http: "true"
     ingress.gcp.kubernetes.io/ssl-redirect: "true"
 spec:
-  ingressClassName: "gce"  # Use GCE Ingress for GKE
+  ingressClassName: "gce"
   tls:
-  - hosts:
-    - monitoring-backend.duckdns.org
-    # ✅ IMPORTANT: DO NOT specify secretName when using ManagedCertificate on GKE.
-    # ❌ Remove: secretName: monitoring-backend-tls-secret
-
+    - hosts:
+        - monitoring-backend.duckdns.org  # Fixed indentation
   rules:
-  - host: monitoring-backend.duckdns.org
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: monitoring-backend-service
-            port:
-              number: 80
+    - host: monitoring-backend.duckdns.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: monitoring-backend-service
+                port:
+                  number: 80
