@@ -4,12 +4,12 @@ metadata:
   name: monitoring-backend-ingress
   namespace: monitoring-backend
   annotations:
-    kubernetes.io/ingress.class: "gce"  # GCE ingress controller
     kubernetes.io/ingress.global-static-ip-name: "monitoring-backend-ip"  # GCP static IP
     networking.gke.io/managed-certificates: "monitoring-backend-ssl-cert"  # reference to ManagedCertificate (not a secret!)
     kubernetes.io/ingress.allow-http: "true"
     ingress.gcp.kubernetes.io/ssl-redirect: "true"
 spec:
+  ingressClassName: "gce"  # Use GCE Ingress for GKE
   tls:
   - hosts:
     - monitoring-backend.duckdns.org
