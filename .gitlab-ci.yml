@@ -827,8 +827,9 @@ deploy_monitoring_backend_gke:
 
     # Create GitLab registry secret for GKE
     - echo "Creating GitLab Container Registry secret for GKE..."
-    - kubectl delete secret gitlab-registry-secret -n ${GKE_NAMESPACE} --ignore-not-found=true
-    - kubectl create secret docker-registry gitlab-registry-secret \
+    - |
+      kubectl delete secret gitlab-registry-secret -n ${GKE_NAMESPACE} --ignore-not-found=true
+      kubectl create secret docker-registry gitlab-registry-secret \
         --docker-server=$CI_REGISTRY \
         --docker-username=$CI_REGISTRY_USER \
         --docker-password=$CI_JOB_TOKEN \
@@ -879,6 +880,7 @@ deploy_monitoring_backend_gke:
 
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
+
 
 
 
