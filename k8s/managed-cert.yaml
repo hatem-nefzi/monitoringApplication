@@ -1,0 +1,8 @@
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: monitoring-backend-ssl-cert
+  namespace: monitoring-backend
+spec:
+  domains:
+    - monitoring-backend.duckdns.org
