@@ -444,7 +444,7 @@ deploy_monitoring_backend_staging:
       echo "=== VALIDATING KUSTOMIZATION ==="
       kustomize build . > $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
       
-      # Check for common issues in the generated manifests
+      # Check for common issues in the generated manifests.
       echo "=== CHECKING FOR MANIFEST ISSUES ==="
       
       # Check for valueFrom conflicts
