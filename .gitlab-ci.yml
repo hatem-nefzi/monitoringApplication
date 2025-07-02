@@ -815,27 +815,20 @@ deploy_monitoring_backend_gke:
   <<: *monitoring_gke_deploy
   stage: deploy-gke
   script:
-    - echo "Listing current directory:"
-    - pwd
-    - ls -la
-    - echo "Checking overlays:"
-    - ls -la k8s/overlays
-    - echo "Checking overlays/gke:"
-    - ls -la k8s/overlays/gke
-    - echo "=== DEPLOYING monitoring-backend TO GKE CLUSTER ==="
+    - echo "=== Context ==="
     - echo "Project $GCP_PROJECT_ID"
     - echo "Cluster $GKE_CLUSTER_NAME"
     - echo "Zone $GKE_ZONE"
     - echo "Namespace $GKE_NAMESPACE"
 
     # Create namespace if it doesn't exist
+    - echo "Creating namespace if it doesn't exist..."
     - kubectl create namespace "$GKE_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
     # Create GitLab registry secret for GKE
-    - |
-      echo "Creating GitLab Container Registry secret for GKE..."
-      kubectl delete secret gitlab-registry-secret -n ${GKE_NAMESPACE} --ignore-not-found=true
-      kubectl create secret docker-registry gitlab-registry-secret \
+    - echo "Creating GitLab Container Registry secret for GKE..."
+    - kubectl delete secret gitlab-registry-secret -n ${GKE_NAMESPACE} --ignore-not-found=true
+    - kubectl create secret docker-registry gitlab-registry-secret \
         --docker-server=$CI_REGISTRY \
         --docker-username=$CI_REGISTRY_USER \
         --docker-password=$CI_JOB_TOKEN \
@@ -852,11 +845,31 @@ deploy_monitoring_backend_gke:
     - echo "Building Kustomize overlay..."
     - kustomize build k8s/overlays/gke | tee kustomize-output.yaml | kubectl apply -f -
 
+    # Ensure ManagedCertificate exists (only create if missing)
+    - echo "Ensuring ManagedCertificate exists..."
+    - |
+      if ! kubectl get managedcertificate monitoring-backend-ssl-cert -n "$GKE_NAMESPACE" > /dev/null 2>&1; then
+        echo "Creating ManagedCertificate..."
+        kubectl apply -f k8s/overlays/gke/managed-cert.yaml
+      else
+        echo "ManagedCertificate already exists. Skipping creation."
+      fi
+
+    # Ensure Ingress exists (only create if missing)
+    - echo "Ensuring Ingress exists..."
+    - |
+      if ! kubectl get ingress monitoring-backend-ingress -n "$GKE_NAMESPACE" > /dev/null 2>&1; then
+        echo "Creating Ingress..."
+        kubectl apply -f k8s/ingress/gke-ingress.yaml
+      else
+        echo "Ingress already exists. Skipping creation."
+      fi
+
     # Wait for rollout to complete
     - echo "Waiting for rollout to complete..."
     - kubectl rollout status deployment/monitoring-backend -n "$GKE_NAMESPACE" --timeout=300s
 
-    # Show pods and services
+    # Resources + logs
     - echo "=== Resources ==="
     - kubectl get all -n "$GKE_NAMESPACE"
     - echo "=== Describe pods ==="
