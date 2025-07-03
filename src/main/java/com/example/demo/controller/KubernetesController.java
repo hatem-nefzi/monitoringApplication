@@ -31,7 +31,7 @@ public class KubernetesController {
 
     @GetMapping("/")
     public String home(){
-        return "monitoring backend is alive"
+        return "monitoring backend is alive";
     }
 
     @GetMapping("/pod-names")
