@@ -870,7 +870,7 @@ deploy_monitoring_backend_gke:
     - echo "Waiting for rollout to complete..."
     - kubectl rollout status deployment/monitoring-backend -n "$GKE_NAMESPACE" --timeout=300s
 
-    # Resources + logs
+    # Resources + logs.
     - echo "=== Resources ==="
     - kubectl get all -n "$GKE_NAMESPACE"
     - echo "=== Describe pods ==="
