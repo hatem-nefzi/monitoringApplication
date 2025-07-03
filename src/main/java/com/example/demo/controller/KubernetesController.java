@@ -29,6 +29,10 @@ public class KubernetesController {
     @Value("${kubernetes.namespace:default}")
     private String namespace;
 
+    @GetMapping("/")
+    public String home(){
+        return "monitoring backend is alive"
+    }
 
     @GetMapping("/pod-names")
     public Map<String, Object> getPodNames() {
