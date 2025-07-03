@@ -7,12 +7,12 @@ metadata:
     kubernetes.io/ingress.global-static-ip-name: "monitoring-backend-ip"
     networking.gke.io/managed-certificates: "monitoring-backend-ssl-cert"
     kubernetes.io/ingress.allow-http: "true"
-    ingress.gcp.kubernetes.io/ssl-redirect: "true"
+    #ingress.gcp.kubernetes.io/ssl-redirect: "true"
 spec:
-  ingressClassName: "gce"
+  ingressClassName: gce  # ✅ moderne et reconnu
   tls:
     - hosts:
-        - monitoring-backend.duckdns.org  # Fixed indentation
+        - monitoring-backend.duckdns.org
   rules:
     - host: monitoring-backend.duckdns.org
       http:
