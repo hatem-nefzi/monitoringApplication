@@ -832,7 +832,7 @@ deploy_monitoring_backend_gke:
       kubectl create secret docker-registry gitlab-registry-secret \
         --docker-server=$CI_REGISTRY \
         --docker-username=$CI_REGISTRY_USER \
-        --docker-password=$CI_JOB_TOKEN \
+        --docker-password=$GITLAB_PERSONAL_TOKEN \
         -n ${GKE_NAMESPACE} \
         --dry-run=client -o yaml | kubectl apply -f -
 
