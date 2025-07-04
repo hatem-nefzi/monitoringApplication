@@ -380,6 +380,22 @@ container_scan:
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
 
+k8s_manifest_scan:
+  <<: *production_job_definition  # ✅ Use your VM runner
+  stage: docker_security
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  script:
+    - echo "🔍 Scanning Kubernetes manifests for security misconfigurations..."
+    - trivy config k8s/overlays \
+        --exit-code 0 \
+        --severity MEDIUM,HIGH,CRITICAL \
+        --no-progress
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "experiment"'
+
+
 
 deploy_monitoring_backend_staging:
   <<: *monitoring_staging_deploy
