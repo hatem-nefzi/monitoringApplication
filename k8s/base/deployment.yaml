@@ -18,7 +18,7 @@ spec:
         - name: gitlab-registry-secret
       containers:
         - name: monitoring-backend
-          image: monitoring-backend  # Ce sera remplacé dynamiquement par kustomize
+          image: monitoring-backend:1.0.0  # Ce sera remplacé dynamiquement par kustomize
           imagePullPolicy: Always
           ports:
             - containerPort: 9090
