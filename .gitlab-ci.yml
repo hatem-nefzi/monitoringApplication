@@ -845,7 +845,7 @@ monitoring_staging_comprehensive_tests:
         ALL_PASSED=false
       fi
 
-    # Final verdict
+    # Final verdict.
     - |
       #!/bin/bash
       echo "=== FINAL RESULT ==="
