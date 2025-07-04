@@ -749,6 +749,7 @@ monitoring_staging_comprehensive_tests:
 
     # Health check tests
     - |
+      bash
       echo "=== HEALTH CHECK TESTS ==="
       endpoints=(
         "/actuator/health"
