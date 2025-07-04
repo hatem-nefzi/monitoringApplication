@@ -711,22 +711,23 @@ monitoring_staging_comprehensive_tests:
       - name: gitlab-ci
         user: {}
       EOF
+
   script:
     - echo "=== COMPREHENSIVE STAGING TESTS ==="
 
     # Wait for pod readiness
     - echo "Waiting for monitoring-backend pod to be ready..."
-    - kubectl wait --for=condition=Ready pod -l app=monitoring-backend -n ${ENVIRONMENT} --timeout=180s
+    - kubectl wait --for=condition=Ready pod -l app=monitoring-backend -n ${ENVIRONMENT} --timeout=300s
 
     # Get pod name
     - POD_NAME=$(kubectl get pods -n ${ENVIRONMENT} -l app=monitoring-backend -o jsonpath='{.items[0].metadata.name}')
     - echo "Using pod $POD_NAME"
 
-    # Wait for Spring Boot to start
+    # Wait for Spring Boot to fully start
     - echo "Waiting for Spring Boot to fully start..."
     - |
       for i in $(seq 1 60); do
-        if kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=5 | grep -q "Started.*Application.*in.*seconds"; then
+        if kubectl logs $POD_NAME -n ${ENVIRONMENT} | grep -q "Started .* in .* seconds"; then
           echo "✅ Spring Boot application has started"
           break
         else
@@ -735,7 +736,7 @@ monitoring_staging_comprehensive_tests:
         fi
         if [ $i -eq 60 ]; then
           echo "❌ App didn't start in 5 minutes"
-          kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=20
+          kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=50
           exit 1
         fi
       done
@@ -780,13 +781,13 @@ monitoring_staging_comprehensive_tests:
     - |
       echo "=== PERFORMANCE TESTS ==="
       echo "Running load test on health endpoint..."
-      if ab -n 100 -c 5 -q "http://localhost:9090/actuator/health" > /tmp/ab_results.txt 2>&1; then
+      if ab -n 100 -c 5 -q "http://localhost:9090/actuator/health" > ab_results.txt 2>&1; then
         echo "✅ Load test completed"
-        grep "Requests per second" /tmp/ab_results.txt || echo "No RPS info found"
-        grep "Time per request" /tmp/ab_results.txt || echo "No timing info found"
+        grep "Requests per second" ab_results.txt || echo "No RPS info found"
+        grep "Time per request" ab_results.txt || echo "No timing info found"
       else
         echo "❌ Load test failed"
-        cat /tmp/ab_results.txt
+        cat ab_results.txt
         ALL_PASSED=false
       fi
 
@@ -856,7 +857,7 @@ monitoring_staging_comprehensive_tests:
 
   artifacts:
     paths:
-      - /tmp/ab_results.txt
+      - ab_results.txt
     expire_in: 1 week
     when: always
 
