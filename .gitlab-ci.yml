@@ -749,7 +749,7 @@ monitoring_staging_comprehensive_tests:
 
     # Health check tests
     - |
-      #!/bin/bash
+      bash -c '
       echo "=== HEALTH CHECK TESTS ==="
       endpoints=(
         "/actuator/health"
@@ -777,83 +777,102 @@ monitoring_staging_comprehensive_tests:
           ALL_PASSED=false
         fi
       done
+      echo "HEALTH_CHECK_RESULT=$ALL_PASSED" > /tmp/health_check_result
+      '
+    - HEALTH_CHECK_RESULT=$(cat /tmp/health_check_result | cut -d'=' -f2)
 
     # Performance tests
     - |
-      #!/bin/bash
+      bash -c '
       echo "=== PERFORMANCE TESTS ==="
       echo "Running load test on health endpoint..."
       if ab -n 100 -c 5 -q "http://localhost:9090/actuator/health" > ab_results.txt 2>&1; then
         echo "✅ Load test completed"
         grep "Requests per second" ab_results.txt || echo "No RPS info found"
         grep "Time per request" ab_results.txt || echo "No timing info found"
+        echo "PERF_TEST_RESULT=true" > /tmp/perf_test_result
       else
         echo "❌ Load test failed"
         cat ab_results.txt
-        ALL_PASSED=false
+        echo "PERF_TEST_RESULT=false" > /tmp/perf_test_result
       fi
+      '
+    - PERF_TEST_RESULT=$(cat /tmp/perf_test_result | cut -d'=' -f2)
 
     # API response validation
     - |
-      #!/bin/bash
+      bash -c '
       echo "=== API RESPONSE VALIDATION ==="
       if health_response=$(curl -s "http://localhost:9090/actuator/health"); then
         echo "Health response: $health_response"
-        if echo "$health_response" | jq -e '.status' > /dev/null 2>&1; then
+        if echo "$health_response" | jq -e ".status" > /dev/null 2>&1; then
           echo "✅ Health endpoint returns valid JSON with status"
+          echo "API_VALIDATION_RESULT=true" > /tmp/api_validation_result
         else
           echo "❌ Health endpoint JSON structure invalid"
-          ALL_PASSED=false
+          echo "API_VALIDATION_RESULT=false" > /tmp/api_validation_result
         fi
       else
         echo "❌ Failed to get health response"
-        ALL_PASSED=false
+        echo "API_VALIDATION_RESULT=false" > /tmp/api_validation_result
       fi
+      '
+    - API_VALIDATION_RESULT=$(cat /tmp/api_validation_result | cut -d'=' -f2)
 
     # Kubernetes API tests
     - |
-      #!/bin/bash
+      bash -c '
       echo "=== KUBERNETES API TESTS ==="
       if pods_response=$(curl -s "http://localhost:9090/api/kubernetes/pods"); then
         echo "Pods API response received"
-        if echo "$pods_response" | jq -e 'type' > /dev/null 2>&1; then
+        if echo "$pods_response" | jq -e "type" > /dev/null 2>&1; then
           echo "✅ Pods API returns valid JSON"
+          echo "K8S_API_RESULT=true" > /tmp/k8s_api_result
         else
           echo "❌ Pods API response not valid JSON"
-          ALL_PASSED=false
+          echo "K8S_API_RESULT=false" > /tmp/k8s_api_result
         fi
       else
         echo "❌ Failed to get pods response"
-        ALL_PASSED=false
+        echo "K8S_API_RESULT=false" > /tmp/k8s_api_result
       fi
+      '
+    - K8S_API_RESULT=$(cat /tmp/k8s_api_result | cut -d'=' -f2)
 
     # Memory usage check
     - |
-      #!/bin/bash
+      bash -c '
       echo "=== RESOURCE USAGE CHECK ==="
       if metrics_response=$(curl -s "http://localhost:9090/actuator/metrics/jvm.memory.used"); then
-        echo "$metrics_response" | jq '.measurements'
-        used_memory=$(echo "$metrics_response" | jq -r '.measurements[0].value')
+        echo "$metrics_response" | jq ".measurements"
+        used_memory=$(echo "$metrics_response" | jq -r ".measurements[0].value")
         if [ "$used_memory" != "null" ]; then
           echo "✅ JVM used memory: $used_memory"
+          echo "MEMORY_CHECK_RESULT=true" > /tmp/memory_check_result
         else
           echo "❌ Unable to parse JVM memory usage"
-          ALL_PASSED=false
+          echo "MEMORY_CHECK_RESULT=false" > /tmp/memory_check_result
         fi
       else
         echo "❌ Failed to get memory metrics"
-        ALL_PASSED=false
+        echo "MEMORY_CHECK_RESULT=false" > /tmp/memory_check_result
       fi
+      '
+    - MEMORY_CHECK_RESULT=$(cat /tmp/memory_check_result | cut -d'=' -f2)
 
-    # Final verdict.
+    # Final verdict
     - |
-      #!/bin/bash
       echo "=== FINAL RESULT ==="
-      if [ "$ALL_PASSED" = true ]; then
+      if [ "$HEALTH_CHECK_RESULT" = "true" ] && [ "$PERF_TEST_RESULT" = "true" ] && [ "$API_VALIDATION_RESULT" = "true" ] && [ "$K8S_API_RESULT" = "true" ] && [ "$MEMORY_CHECK_RESULT" = "true" ]; then
         echo "✅ ALL TESTS PASSED"
         exit 0
       else
         echo "❌ SOME TESTS FAILED"
+        echo "Health Check: $HEALTH_CHECK_RESULT"
+        echo "Performance Test: $PERF_TEST_RESULT"
+        echo "API Validation: $API_VALIDATION_RESULT"
+        echo "K8s API Test: $K8S_API_RESULT"
+        echo "Memory Check: $MEMORY_CHECK_RESULT"
         exit 1
       fi
 
