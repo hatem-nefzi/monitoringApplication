@@ -428,7 +428,7 @@ deploy_monitoring_backend_staging:
       kubectl create secret docker-registry gitlab-registry-secret \
         --docker-server=${CI_REGISTRY} \
         --docker-username=${CI_REGISTRY_USER} \
-        --docker-password=${CI_REGISTRY_PASSWORD} \
+        --docker-password=${GITLAB_REGISTRY_PASSWORD} \
         -n ${ENVIRONMENT} \
         --dry-run=client -o yaml | kubectl apply -f -
     
