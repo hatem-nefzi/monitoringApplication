@@ -22,9 +22,12 @@ spec:
 
       imagePullSecrets:
         - name: gitlab-registry-secret
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}  # 🔒 Volume temporaire pour /tmp
       containers:
         - name: monitoring-backend
-          image: monitoring-backend:1.0.0  # Ce sera remplacé dynamiquement par kustomize
+          image: monitoring-backend:1.0.0  # Remplacé par kustomize
           imagePullPolicy: Always
           ports:
             - containerPort: 9090
@@ -48,3 +51,6 @@ spec:
             readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp  # 🔥 Permet à l'app d’écrire dans /tmp
