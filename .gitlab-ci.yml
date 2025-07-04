@@ -381,17 +381,28 @@ container_scan:
     - if: $CI_COMMIT_BRANCH == "experiment"
 
 k8s_manifest_scan:
-  <<: *production_job_definition  # ✅ Use your VM runner
+  <<: *production_job_definition  # using vm2 as runner
   stage: docker_security
   image:
     name: aquasec/trivy:latest
     entrypoint: [""]
   script:
     - echo "🔍 Scanning Kubernetes manifests for security misconfigurations..."
-    - trivy config k8s/overlays \
+    # scan base directory first
+    - trivy config k8s/base \
         --exit-code 0 \
         --severity MEDIUM,HIGH,CRITICAL \
-        --no-progress
+        --no-progress || echo "scan finished with issues in base"
+    # loop over each overlay and scan it !reference 
+    - |
+      for overlay in k8s/overlays/*; do
+        echo "🔎 Scanning $overlay ..."
+        trivy config "$overlay" \
+          --exit-code 0 \
+          --severity MEDIUM,HIGH,CRITICAL \
+          --no-progress || echo "Scan finished with issues in $overlay"
+      done
+
   rules:
     - if: '$CI_COMMIT_BRANCH == "experiment"'
 
