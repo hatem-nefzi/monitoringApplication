@@ -749,7 +749,7 @@ monitoring_staging_comprehensive_tests:
 
     # Health check tests
     - |
-      bash
+      #!/bin/bash
       echo "=== HEALTH CHECK TESTS ==="
       endpoints=(
         "/actuator/health"
@@ -780,6 +780,7 @@ monitoring_staging_comprehensive_tests:
 
     # Performance tests
     - |
+      #!/bin/bash
       echo "=== PERFORMANCE TESTS ==="
       echo "Running load test on health endpoint..."
       if ab -n 100 -c 5 -q "http://localhost:9090/actuator/health" > ab_results.txt 2>&1; then
@@ -794,6 +795,7 @@ monitoring_staging_comprehensive_tests:
 
     # API response validation
     - |
+      #!/bin/bash
       echo "=== API RESPONSE VALIDATION ==="
       if health_response=$(curl -s "http://localhost:9090/actuator/health"); then
         echo "Health response: $health_response"
@@ -810,6 +812,7 @@ monitoring_staging_comprehensive_tests:
 
     # Kubernetes API tests
     - |
+      #!/bin/bash
       echo "=== KUBERNETES API TESTS ==="
       if pods_response=$(curl -s "http://localhost:9090/api/kubernetes/pods"); then
         echo "Pods API response received"
@@ -826,6 +829,7 @@ monitoring_staging_comprehensive_tests:
 
     # Memory usage check
     - |
+      #!/bin/bash
       echo "=== RESOURCE USAGE CHECK ==="
       if metrics_response=$(curl -s "http://localhost:9090/actuator/metrics/jvm.memory.used"); then
         echo "$metrics_response" | jq '.measurements'
@@ -843,6 +847,7 @@ monitoring_staging_comprehensive_tests:
 
     # Final verdict
     - |
+      #!/bin/bash
       echo "=== FINAL RESULT ==="
       if [ "$ALL_PASSED" = true ]; then
         echo "✅ ALL TESTS PASSED"
@@ -854,14 +859,13 @@ monitoring_staging_comprehensive_tests:
 
   after_script:
     - echo "Cleaning up port-forward..."
-    - kill $PORT_FORWARD_PID || echo "No port-forward to kill"
+    - if [ ! -z "$PORT_FORWARD_PID" ]; then kill $PORT_FORWARD_PID 2>/dev/null || echo "Port-forward process already terminated"; fi
 
   artifacts:
     paths:
       - ab_results.txt
     expire_in: 1 week
     when: always
-
 
 
 deploy_production:
