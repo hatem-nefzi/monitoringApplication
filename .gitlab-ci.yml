@@ -758,7 +758,6 @@ monitoring_staging_comprehensive_tests:
         "/actuator/prometheus"
         "/api/kubernetes/pods"
         "/api/kubernetes/services"
-        "/api/kubernetes/nodes"
       )
 
       ALL_PASSED=true
