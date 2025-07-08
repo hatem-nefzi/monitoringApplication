@@ -1,0 +1,27 @@
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+resources:
+  - namespace.yaml
+  
+  # Prometheus
+  - prometheus/prometheus-rbac.yaml
+  - prometheus/prometheus-config.yaml
+  - prometheus/prometheus-deployment.yaml
+  - prometheus/prometheus-service.yaml
+  
+  # Grafana
+  - grafana/grafana-config.yaml
+  - grafana/grafana-deployment.yaml
+  - grafana/grafana-service.yaml
+  - grafana/dashboards/app-dashboard.yaml
+  
+ 
+  # Ingress
+  - ingress/monitoring-ingress.yaml
+
+commonLabels:
+  monitoring: "true"
