@@ -13,15 +13,9 @@ resources:
   - prometheus/prometheus-deployment.yaml
   - prometheus/prometheus-service.yaml
   
-  # Grafana
-  - grafana/grafana-config.yaml
-  - grafana/grafana-deployment.yaml
-  - grafana/grafana-service.yaml
-  - grafana/dashboards/app-dashboard.yaml
+  
   
  
-  # Ingress
-  - ingress/monitoring-ingress.yaml
-
+  
 commonLabels:
   monitoring: "true"
