@@ -1119,7 +1119,6 @@ deploy_monitoring_backend_gke:
 
 deploy_prometheus_gke:
   <<: *monitoring_gke_deploy
-  image: bitnami/kubectl:latest
   stage: deploy-gke
   script:
     - echo "Deploying Prometheus to GKE monitoring namespace..."
