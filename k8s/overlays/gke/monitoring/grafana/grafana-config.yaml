@@ -43,70 +43,69 @@ metadata:
 data:
   kubernetes-overview.json: |
     {
-      "dashboard": {
-        "id": null,
-        "title": "Kubernetes Overview",
-        "tags": ["kubernetes"],
-        "timezone": "browser",
-        "panels": [
-          {
-            "id": 1,
-            "title": "Pod CPU Usage",
-            "type": "graph",
-            "targets": [
-              {
-                "expr": "rate(container_cpu_usage_seconds_total{pod=~\"monitoring-backend.*\"}[5m])",
-                "legendFormat": "{{pod}}"
-              }
-            ],
-            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
-            "yAxes": [
-              {
-                "label": "CPU Usage",
-                "max": null,
-                "min": null
-              }
-            ]
-          },
-          {
-            "id": 2,
-            "title": "Pod Memory Usage",
-            "type": "graph",
-            "targets": [
-              {
-                "expr": "container_memory_usage_bytes{pod=~\"monitoring-backend.*\"}",
-                "legendFormat": "{{pod}}"
-              }
-            ],
-            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
-            "yAxes": [
-              {
-                "label": "Memory Usage",
-                "max": null,
-                "min": null
-              }
-            ]
-          },
-          {
-            "id": 3,
-            "title": "Service Availability",
-            "type": "stat",
-            "targets": [
-              {
-                "expr": "up{job=\"monitoring-backend\"}",
-                "legendFormat": "{{instance}}"
-              }
-            ],
-            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
-          }
-        ],
-        "time": {
-          "from": "now-1h",
-          "to": "now"
+      "id": null,
+      "title": "Kubernetes Overview",
+      "tags": ["kubernetes"],
+      "timezone": "browser",
+      "panels": [
+        {
+          "id": 1,
+          "title": "Pod CPU Usage",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(container_cpu_usage_seconds_total{pod=~\"monitoring-backend.*\"}[5m])",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "yAxes": [
+            {
+              "label": "CPU Usage",
+              "max": null,
+              "min": null
+            }
+          ]
         },
-        "refresh": "5s"
-      }
+        {
+          "id": 2,
+          "title": "Pod Memory Usage",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "container_memory_usage_bytes{pod=~\"monitoring-backend.*\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "yAxes": [
+            {
+              "label": "Memory Usage",
+              "max": null,
+              "min": null
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Service Availability",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "up{job=\"monitoring-backend\"}",
+              "legendFormat": "{{instance}}"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+        }
+      ],
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "refresh": "5s"
     }
+
 ---
 # Grafana Secret for admin password
 apiVersion: v1
