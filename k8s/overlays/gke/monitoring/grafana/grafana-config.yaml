@@ -1,0 +1,133 @@
+# Grafana ConfigMap for datasources
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+    - name: Prometheus
+      type: prometheus
+      access: proxy
+      url: http://prometheus:9090
+      isDefault: true
+      editable: true
+---
+# Grafana ConfigMap for dashboard provisioning
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-config
+  namespace: monitoring
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+    - name: 'default'
+      orgId: 1
+      folder: ''
+      type: file
+      disableDeletion: false
+      updateIntervalSeconds: 10
+      options:
+        path: /var/lib/grafana/dashboards
+---
+# Basic Kubernetes Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+data:
+  kubernetes-overview.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Kubernetes Overview",
+        "tags": ["kubernetes"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Pod CPU Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(container_cpu_usage_seconds_total{pod=~\"monitoring-backend.*\"}[5m])",
+                "legendFormat": "{{pod}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "yAxes": [
+              {
+                "label": "CPU Usage",
+                "max": null,
+                "min": null
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Pod Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "container_memory_usage_bytes{pod=~\"monitoring-backend.*\"}",
+                "legendFormat": "{{pod}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "yAxes": [
+              {
+                "label": "Memory Usage",
+                "max": null,
+                "min": null
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Service Availability",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "up{job=\"monitoring-backend\"}",
+                "legendFormat": "{{instance}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "5s"
+      }
+    }
+---
+# Grafana Secret for admin password
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-secret
+  namespace: monitoring
+type: Opaque
+data:
+  admin-password: YWRtaW4=  # base64 encoded "admin" - change this!
+---
+# Grafana PVC for persistent storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-storage
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard-rwo  # GKE default storage class

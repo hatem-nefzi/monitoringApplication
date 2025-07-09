@@ -12,6 +12,11 @@ resources:
   - prometheus/prometheus-config.yaml
   - prometheus/prometheus-deployment.yaml
   - prometheus/prometheus-service.yaml
+  # Grafana
+  - grafana/grafana-rbac.yaml
+  - grafana/grafana-config.yaml
+  - grafana/grafana-deployment.yaml
+  - grafana/grafana-service.yaml
   
   
   
