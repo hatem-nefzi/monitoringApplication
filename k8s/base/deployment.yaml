@@ -16,7 +16,7 @@ spec:
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9090"
-        prometheus.io/path: "/metrics"
+        prometheus.io/path: "/actuator/prometheus"  # 🔒 Chemin pour les métriques Prometheus
     spec:
       securityContext:
         runAsUser: 1001
