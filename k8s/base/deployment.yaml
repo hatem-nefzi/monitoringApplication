@@ -13,6 +13,10 @@ spec:
     metadata:
       labels:
         app: monitoring-backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
     spec:
       securityContext:
         runAsUser: 1001
