@@ -1117,7 +1117,7 @@ deploy_monitoring_backend_gke:
     - echo "=== Describe pods ==="
     - kubectl describe pods -n "$GKE_NAMESPACE"
     - echo "=== Logs (latest) ==="
-    - kubectl logs -l app=monitoring-backend -n "$GKE_NAMESPACE" --tail=100
+    - kubectl logs -l app=monitoring-backend -n "$GKE_NAMESPACE" --tail=100 --ignore-errors
 
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
