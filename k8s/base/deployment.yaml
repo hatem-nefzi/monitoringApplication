@@ -28,7 +28,7 @@ spec:
         - name: gitlab-registry-secret
       volumes:
         - name: tmp-volume
-          emptyDir: {}  # 🔒 Volume temporaire pour /tmp
+          emptyDir: {}  # 🔒 Volume temporaire pour /tmp.
       containers:
         - name: monitoring-backend
           image: monitoring-backend:1.0.0  # Remplacé par kustomize
