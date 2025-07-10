@@ -107,7 +107,7 @@ data:
     }
 
 ---
-# Grafana Secret for admin password
+# Grafana Secret for admin password.
 apiVersion: v1
 kind: Secret
 metadata:
