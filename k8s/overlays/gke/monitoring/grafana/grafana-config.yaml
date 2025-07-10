@@ -92,8 +92,8 @@ data:
           "type": "stat",
           "targets": [
             {
-              "expr": "up{namespace=\"monitoring-backend\"}",
-              "legendFormat": "{{pod}}"
+              "expr": "up{job=\"monitoring-backend\"}",
+              "legendFormat": "{{kubernetes_name}}"
             }
           ],
           "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
