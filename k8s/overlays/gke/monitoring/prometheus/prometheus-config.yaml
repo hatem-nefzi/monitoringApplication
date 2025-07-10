@@ -82,10 +82,10 @@ data:
         relabel_configs:
         - source_labels: [__meta_kubernetes_service_name]
           action: keep
-          regex: monitoring-backend
+          regex: monitoring-backend-service # Match your service name
         - source_labels: [__meta_kubernetes_namespace]
           action: keep
-          regex: production
+          regex: monitoring-backend # Match your namespace
         - source_labels: [__meta_kubernetes_endpoint_port_name]
           action: keep
           regex: http
