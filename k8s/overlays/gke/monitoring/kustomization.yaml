@@ -17,6 +17,8 @@ resources:
   - grafana/grafana-config.yaml
   - grafana/grafana-deployment.yaml
   - grafana/grafana-service.yaml
+  # Ingress
+  - ingress/monitoring-ingress.yaml
   
   
   
