@@ -92,8 +92,8 @@ data:
           "type": "stat",
           "targets": [
             {
-              "expr": "up{job=\"monitoring-backend\"}",
-              "legendFormat": "{{instance}}"
+              "expr": "up{pod=~\"monitoring-backend\"}",
+              "legendFormat": "{{pod}}"
             }
           ],
           "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
