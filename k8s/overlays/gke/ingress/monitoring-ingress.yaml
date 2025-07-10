@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: monitoring-ingress
-  namespace: monitoring-ingress
+  namespace: monitoring
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
@@ -13,8 +13,10 @@ spec:
   tls:
     - hosts:
         - grafana-backend.duckdns.org
+      secretName: grafana-tls
+    - hosts:
         - prometheus-backend.duckdns.org
-      secretName: monitoring-tls
+      secretName: prometheus-tls
   rules:
     - host: grafana-backend.duckdns.org
       http:
@@ -26,7 +28,7 @@ spec:
                 name: grafana
                 port:
                   number: 3000
-    - host: prometheus.backend.duckdns.org
+    - host: prometheus-backend.duckdns.org
       http:
         paths:
           - path: /
