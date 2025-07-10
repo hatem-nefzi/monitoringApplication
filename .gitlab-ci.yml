@@ -1107,7 +1107,7 @@ deploy_monitoring_backend_gke:
         echo "Ingress already exists. Skipping creation."
       fi
 
-    # Wait for rollout to complete
+    # Wait for rollout to complete.
     - echo "Waiting for rollout to complete..."
     - kubectl rollout status deployment/monitoring-backend -n "$GKE_NAMESPACE" --timeout=300s
 
