@@ -92,7 +92,7 @@ data:
           "type": "stat",
           "targets": [
             {
-              "expr": "up{pod=~\"monitoring-backend.*\"}",
+              "expr": "up{app="monitoring-backend"}",
               "legendFormat": "{{pod}}"
             }
           ],
