@@ -172,7 +172,7 @@ variables:
       apiVersion: v1
       clusters:
       - cluster:
-          server: http://${HOST_IP}:8888
+          server: ${STAGING_KUBE_SERVER} 
           insecure-skip-tls-verify: true
         name: minikube
       contexts:
