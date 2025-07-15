@@ -159,34 +159,14 @@ variables:
   <<: *monitoring_backend_deploy_base
   variables:
     ENVIRONMENT: staging
-    KUBECONFIG: "${CI_PROJECT_DIR}/.kube/config"
+    KUBECONFIG: "/root/.kube/config"  # ✅ Use the real kubeconfig already mounted
     HOST_IP: "172.17.0.1"
     KUBECTL_VERSION: "v1.32.3"
   before_script:
     - !reference [.monitoring_backend_deploy_base, before_script]
     - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
     - chmod +x kubectl && mv kubectl /usr/local/bin/
-    - mkdir -p "$(dirname "$KUBECONFIG")"
-    - |
-      cat > "${KUBECONFIG}" <<EOF
-      apiVersion: v1
-      clusters:
-      - cluster:
-          server: http://${HOST_IP}:8888
-          insecure-skip-tls-verify: true
-        name: minikube
-      contexts:
-      - context:
-          cluster: minikube
-          user: gitlab-ci
-        name: minikube
-      current-context: minikube
-      kind: Config
-      preferences: {}
-      users:
-      - name: gitlab-ci
-        user: {}
-      EOF
+
 
 .monitoring_production_deploy: &monitoring_production_deploy
   <<: *monitoring_backend_deploy_base
