@@ -418,10 +418,11 @@ deploy_monitoring_backend_staging:
   <<: *monitoring_staging_deploy
   stage: deploy-staging
   before_script:
-    - echo "Rebuilding kubeconfig for minikube Ip"
+    - echo "Rebuilding kubeconfig for minikube IP"
     - export MINIKUBE_IP=$(minikube ip)
     - mkdir -p ~/.kube
-    - cat <<EOF > ~/.kube/config
+    - |
+      cat <<EOF > ~/.kube/config
       apiVersion: v1
       kind: Config
       clusters:
@@ -464,6 +465,7 @@ deploy_monitoring_backend_staging:
     # Store the project root
     - PROJECT_ROOT=$(pwd)
     - echo "Project root $PROJECT_ROOT"
+    
     # Apply RBAC resources first
     - |
       echo "=== APPLYING RBAC RESOURCES ==="
@@ -501,7 +503,7 @@ deploy_monitoring_backend_staging:
       echo "=== VALIDATING KUSTOMIZATION ==="
       kustomize build . > $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
       
-      # Check for common issues in the generated manifests.
+      # Check for common issues in the generated manifests
       echo "=== CHECKING FOR MANIFEST ISSUES ==="
       
       # Check for valueFrom conflicts
