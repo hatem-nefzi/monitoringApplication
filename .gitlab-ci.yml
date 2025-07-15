@@ -706,7 +706,7 @@ monitoring_staging_smoke_tests:
 monitoring_staging_comprehensive_tests:
   <<: *kubectl_definition
   stage: staging-tests
-  image: alpine:3.18
+  image: jordi/ab:latest
   variables:
     ENVIRONMENT: staging
     KUBECTL_VERSION: "v1.32.3"
@@ -714,7 +714,7 @@ monitoring_staging_comprehensive_tests:
     MINIKUBE_IP: "192.168.49.2"  # Changed from HOST_IP to MINIKUBE_IP
     MINIKUBE_PORT: "8443"        # Changed from 8888 to 8443
   before_script:
-    - apk add --no-cache curl jq bash wget
+    - apt-get update && apt-get install -y jq wget
     - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
     - chmod +x kubectl && mv kubectl /usr/local/bin/
     - mkdir -p "$(dirname "$KUBECONFIG")"
