@@ -160,7 +160,7 @@ variables:
   variables:
     ENVIRONMENT: staging
     KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
-    MINIKUBE_IP: "192.168.58.2"
+    MINIKUBE_IP: "192.168.49.2"
     MINIKUBE_PORT: "8443"
     KUBECTL_VERSION: "v1.32.3"
   before_script:
