@@ -711,18 +711,20 @@ monitoring_staging_comprehensive_tests:
     ENVIRONMENT: staging
     KUBECTL_VERSION: "v1.32.3"
     KUBECONFIG: "${CI_PROJECT_DIR}/.kube/config"
-    HOST_IP: "172.17.0.1"
+    MINIKUBE_IP: "192.168.49.2"  # Changed from HOST_IP to MINIKUBE_IP
+    MINIKUBE_PORT: "8443"        # Changed from 8888 to 8443
   before_script:
-    - apk add --no-cache curl jq bash wget apache2-utils
+    - apk add --no-cache curl jq bash wget
     - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
     - chmod +x kubectl && mv kubectl /usr/local/bin/
     - mkdir -p "$(dirname "$KUBECONFIG")"
     - |
+      echo "Creating kubeconfig with service account token..."
       cat > "${KUBECONFIG}" <<EOF
       apiVersion: v1
       clusters:
       - cluster:
-          server: http://${HOST_IP}:8888
+          server: https://${MINIKUBE_IP}:${MINIKUBE_PORT}  # Changed to HTTPS
           insecure-skip-tls-verify: true
         name: minikube
       contexts:
@@ -735,8 +737,15 @@ monitoring_staging_comprehensive_tests:
       preferences: {}
       users:
       - name: gitlab-ci
-        user: {}
+        user:
+          token: ${MINIKUBE_TOKEN}  # Added token authentication
       EOF
+    
+    # Test the connection
+    - echo "Testing Kubernetes connection..."
+    - kubectl cluster-info
+    - kubectl get nodes
+    - echo "✅ Kubernetes connection successful!"
 
   script:
     - echo "=== COMPREHENSIVE STAGING TESTS ==="
