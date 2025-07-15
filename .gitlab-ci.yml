@@ -160,8 +160,8 @@ variables:
   variables:
     ENVIRONMENT: staging
     KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
-    # Use the staging VM IP with insecure port
-    HOST_IP: "192.168.100.155"  # or use 192.168.58.2 if that's the accessible IP
+    MINIKUBE_IP: "192.168.58.2"
+    MINIKUBE_PORT: "8443"
     KUBECTL_VERSION: "v1.32.3"
   before_script:
     - !reference [.monitoring_backend_deploy_base, before_script]
@@ -169,11 +169,12 @@ variables:
     - chmod +x kubectl && mv kubectl /usr/local/bin/
     - mkdir -p "$(dirname "$KUBECONFIG")"
     - |
+      echo "Creating kubeconfig with service account token..."
       cat > "$KUBECONFIG" <<EOF
       apiVersion: v1
       clusters:
       - cluster:
-          server: http://${HOST_IP}:8888
+          server: https://${MINIKUBE_IP}:${MINIKUBE_PORT}
           insecure-skip-tls-verify: true
         name: minikube
       contexts:
@@ -186,9 +187,15 @@ variables:
       preferences: {}
       users:
       - name: gitlab-ci
-        user: {}
+        user:
+          token: ${MINIKUBE_TOKEN}
       EOF
-
+    
+    # Test the connection
+    - echo "Testing Kubernetes connection..."
+    - kubectl cluster-info
+    - kubectl get nodes
+    - echo "✅ Kubernetes connection successful!"
 
 .monitoring_production_deploy: &monitoring_production_deploy
   <<: *monitoring_backend_deploy_base
