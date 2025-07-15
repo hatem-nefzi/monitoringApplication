@@ -81,7 +81,7 @@ variables:
   MONITORING_BACKEND_DOCKER_USERNAME: "hatemnefzi"
   MONITORING_BACKEND_DOCKER_PASSWORD: "your-docker-password"
 
-  # Environment specific resources.
+  # Environment specific resources
   STAGING_MONITORING_REPLICAS: "1"
   STAGING_MONITORING_MEMORY_REQUEST: "192Mi"
   STAGING_MONITORING_MEMORY_LIMIT: "384Mi"
