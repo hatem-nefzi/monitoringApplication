@@ -515,7 +515,7 @@ deploy_monitoring_backend_staging:
         exit 1
       fi
     
-    # Apply ingress if it exists
+    # Apply ingress if it exists.
     - |
       echo "=== APPLYING INGRESS ==="
       if [ -f "$PROJECT_ROOT/k8s/ingress/staging-ingress.yaml" ]; then
