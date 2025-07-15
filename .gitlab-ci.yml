@@ -160,9 +160,8 @@ variables:
   variables:
     ENVIRONMENT: staging
     KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
-    # Use the actual minikube IP and port
-    MINIKUBE_IP: "192.168.58.2"
-    MINIKUBE_PORT: "8443"
+    # Use the staging VM IP with insecure port
+    HOST_IP: "192.168.100.155"  # or use 192.168.58.2 if that's the accessible IP
     KUBECTL_VERSION: "v1.32.3"
   before_script:
     - !reference [.monitoring_backend_deploy_base, before_script]
@@ -170,36 +169,25 @@ variables:
     - chmod +x kubectl && mv kubectl /usr/local/bin/
     - mkdir -p "$(dirname "$KUBECONFIG")"
     - |
-      # Get the actual cluster CA certificate and client credentials
-      echo "Setting up kubeconfig for minikube cluster..."
-      
-      # Copy the existing minikube config as a template
       cat > "$KUBECONFIG" <<EOF
       apiVersion: v1
       clusters:
       - cluster:
-          server: https://${MINIKUBE_IP}:${MINIKUBE_PORT}
+          server: http://${HOST_IP}:8888
           insecure-skip-tls-verify: true
         name: minikube
       contexts:
       - context:
           cluster: minikube
-          user: minikube
+          user: gitlab-ci
         name: minikube
       current-context: minikube
       kind: Config
       preferences: {}
       users:
-      - name: minikube
-        user:
-          client-certificate-data: $(echo "dummy" | base64)
-          client-key-data: $(echo "dummy" | base64)
+      - name: gitlab-ci
+        user: {}
       EOF
-    
-    # Test connectivity
-    - echo "Testing connectivity to Kubernetes API..."
-    - curl -k -m 10 https://${MINIKUBE_IP}:${MINIKUBE_PORT}/version || echo "Cannot connect to API server"
-    - kubectl cluster-info || echo "Cluster info failed"
 
 
 .monitoring_production_deploy: &monitoring_production_deploy
