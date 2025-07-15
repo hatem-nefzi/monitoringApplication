@@ -420,14 +420,14 @@ deploy_monitoring_backend_staging:
   before_script:
     - echo "Rebuilding kubeconfig for minikube IP"
     - export MINIKUBE_IP=$(minikube ip)
-    - mkdir -p ~/.kube
+    - mkdir -p .kube
     - |
       cat <<EOF > ~/.kube/config
       apiVersion: v1
       kind: Config
       clusters:
       - cluster:
-          server: http://$MINIKUBE_IP:8888
+          server: https://192.168.58.2:8443
           insecure-skip-tls-verify: true
         name: minikube
       contexts:
@@ -441,6 +441,7 @@ deploy_monitoring_backend_staging:
         user:
           token: dummy
       EOF
+    - export KUBECONFIG=$PWD/.kube/config  
   
   script:
     - echo "=== DEPLOYING MONITORING BACKEND TO STAGING ==="
