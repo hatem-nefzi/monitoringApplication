@@ -21,7 +21,9 @@ resources:
   - ingress/monitoring-ingress.yaml
   - ingress/alertmanager-ingress.yaml
   # Alertmanager
-  - alertmanager
+  - alertmanager/service.yaml
+  - alertmanager/deployment.yaml
+  - alertmanager/configmap.yaml
   
   
   
