@@ -27,11 +27,6 @@ resources:
   # Alert Rules ConfigMap
   - prometheus/alert-rules-configmap.yaml
 
-configMapGenerator:
-  - name: prometheus-alert-rules
-    namespace: monitoring
-    files:
-      - prometheus/rules/always-alert.rules.yaml
 
   
   
