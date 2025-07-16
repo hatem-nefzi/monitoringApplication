@@ -23,7 +23,7 @@ resources:
   # Alertmanager
   - alertmanager/service.yaml
   - alertmanager/deployment.yaml
-  - alertmanager/configmap.yaml
+  - alertmanager/config.yaml
   
   
   
