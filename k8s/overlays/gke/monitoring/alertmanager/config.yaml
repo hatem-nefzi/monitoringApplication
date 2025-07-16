@@ -37,9 +37,11 @@ data:
       email_configs:
       - to: 'ALERT_EMAIL_PLACEHOLDER'  # Will be replaced
         from: 'SMTP_FROM_PLACEHOLDER'  # Will be replaced
-        username: 'SMTP_USERNAME_PLACEHOLDER'  # Will be replaced
-        password: 'SMTP_PASSWORD_PLACEHOLDER'  # Will be replaced
-        subject: '🚨 [MONITORING] {{ .GroupLabels.alertname }}'
+        auth_username: 'SMTP_USERNAME_PLACEHOLDER'  # Will be replaced
+        auth_password: 'SMTP_PASSWORD_PLACEHOLDER'  # Will be replaced
+        smtp_require_tls: true
+        headers:
+          subject: '🚨 [MONITORING] {{ .GroupLabels.alertname }}'
         html: |
           <h2>🚨 Alert Notification</h2>
           <p><strong>Status:</strong> {{ .Status }}</p>
