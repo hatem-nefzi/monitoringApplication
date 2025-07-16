@@ -1,4 +1,3 @@
-# Updated ConfigMap (k8s/overlays/gke/monitoring/alertmanager/configmap.yaml)
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -9,12 +8,13 @@ metadata:
 data:
   alertmanager.yml: |
     global:
-      # 📧 EMAIL CONFIGURATION - values from secret
       smtp_smarthost: 'smtp.gmail.com:587'
       smtp_hello: 'alertmanager'
+      smtp_from: 'SMTP_FROM_PLACEHOLDER'  # to be replaced
+      smtp_auth_username: 'SMTP_USERNAME_PLACEHOLDER'  # to be replaced
+      smtp_auth_password: 'SMTP_PASSWORD_PLACEHOLDER'  # to be replaced
       smtp_require_tls: true
-    
-    # 📬 ROUTING CONFIGURATION
+
     route:
       group_by: ['alertname', 'severity']
       group_wait: 10s
@@ -30,70 +30,20 @@ data:
           severity: warning
         receiver: 'warning-alerts'
         repeat_interval: 2h
-    
-    # 📨 RECEIVERS CONFIGURATION
+
     receivers:
     - name: 'email-alerts'
       email_configs:
-      - to: 'ALERT_EMAIL_PLACEHOLDER'  # Will be replaced
-        from: 'SMTP_FROM_PLACEHOLDER'  # Will be replaced
-        auth_username: 'SMTP_USERNAME_PLACEHOLDER'  # Will be replaced
-        auth_password: 'SMTP_PASSWORD_PLACEHOLDER'  # Will be replaced
-        smtp_require_tls: true
-        headers:
-          subject: '🚨 [MONITORING] {{ .GroupLabels.alertname }}'
-        html: |
-          <h2>🚨 Alert Notification</h2>
-          <p><strong>Status:</strong> {{ .Status }}</p>
-          {{ range .Alerts }}
-          <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0;">
-            <h3>{{ .Annotations.summary }}</h3>
-            <p><strong>Description:</strong> {{ .Annotations.description }}</p>
-            <p><strong>Instance:</strong> {{ .Labels.instance }}</p>
-            <p><strong>Severity:</strong> {{ .Labels.severity }}</p>
-            <p><strong>Started:</strong> {{ .StartsAt }}</p>
-            {{ if .EndsAt }}<p><strong>Ended:</strong> {{ .EndsAt }}</p>{{ end }}
-          </div>
-          {{ end }}
-    
+      - to: 'ALERT_EMAIL_PLACEHOLDER'
+
     - name: 'critical-alerts'
       email_configs:
       - to: 'ALERT_EMAIL_PLACEHOLDER'
-        from: 'SMTP_FROM_PLACEHOLDER'
-        username: 'SMTP_USERNAME_PLACEHOLDER'
-        password: 'SMTP_PASSWORD_PLACEHOLDER'
-        subject: '🔥 [CRITICAL] {{ .GroupLabels.alertname }} - IMMEDIATE ACTION NEEDED'
-        html: |
-          <h2 style="color: red;">🔥 CRITICAL ALERT</h2>
-          <p><strong>⚠️ IMMEDIATE ACTION REQUIRED ⚠️</strong></p>
-          {{ range .Alerts }}
-          <div style="border: 2px solid red; padding: 15px; margin: 10px 0; background-color: #ffebee;">
-            <h3 style="color: red;">{{ .Annotations.summary }}</h3>
-            <p><strong>Description:</strong> {{ .Annotations.description }}</p>
-            <p><strong>Instance:</strong> {{ .Labels.instance }}</p>
-            <p><strong>Started:</strong> {{ .StartsAt }}</p>
-          </div>
-          {{ end }}
-    
+
     - name: 'warning-alerts'
       email_configs:
       - to: 'ALERT_EMAIL_PLACEHOLDER'
-        from: 'SMTP_FROM_PLACEHOLDER'
-        username: 'SMTP_USERNAME_PLACEHOLDER'
-        password: 'SMTP_PASSWORD_PLACEHOLDER'
-        subject: '⚠️ [WARNING] {{ .GroupLabels.alertname }}'
-        html: |
-          <h2 style="color: orange;">⚠️ Warning Alert</h2>
-          {{ range .Alerts }}
-          <div style="border: 1px solid orange; padding: 10px; margin: 10px 0; background-color: #fff3e0;">
-            <h3 style="color: orange;">{{ .Annotations.summary }}</h3>
-            <p><strong>Description:</strong> {{ .Annotations.description }}</p>
-            <p><strong>Instance:</strong> {{ .Labels.instance }}</p>
-            <p><strong>Started:</strong> {{ .StartsAt }}</p>
-          </div>
-          {{ end }}
-    
-    # 🔕 INHIBIT RULES (prevent spam)
+
     inhibit_rules:
     - source_match:
         severity: 'critical'
