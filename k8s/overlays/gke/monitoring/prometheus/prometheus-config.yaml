@@ -9,6 +9,13 @@ data:
       scrape_interval: 15s
       evaluation_interval: 15s
     
+    # ADD ALERTMANAGER CONFIGURATION
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+              - alertmanager:9093
+    
     rule_files:
       - "/etc/prometheus/rules/*.yml"
       - "/etc/prometheus/rules/*.yaml"  # ADD THIS LINE
@@ -84,10 +91,10 @@ data:
         relabel_configs:
         - source_labels: [__meta_kubernetes_service_name]
           action: keep
-          regex: monitoring-backend-service # Match your service name
+          regex: monitoring-backend-service
         - source_labels: [__meta_kubernetes_namespace]
           action: keep
-          regex: monitoring-backend # Match your namespace
+          regex: monitoring-backend
         - source_labels: [__meta_kubernetes_endpoint_port_name]
           action: keep
           regex: http
@@ -98,7 +105,7 @@ data:
         - source_labels: [__meta_kubernetes_service_name]
           target_label: kubernetes_name
 
-      # Kubelet cAdvisor metrics (for container CPU/memory usage)
+      # Kubelet cAdvisor metrics
       - job_name: 'kubernetes-cadvisor'
         scheme: https
         tls_config:
@@ -115,37 +122,3 @@ data:
           regex: (.+)
           target_label: __metrics_path__
           replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
-
-        
-        
-  
-  rules.yml: |
-    groups:
-    - name: monitoring-backend.rules
-      rules:
-      - alert: MonitoringBackendDown
-        expr: up{job="monitoring-backend"} == 0
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Monitoring Backend is down"
-          description: "Monitoring Backend has been down for more than 1 minute."
-      
-      - alert: MonitoringBackendHighMemory
-        expr: container_memory_usage_bytes{pod=~"monitoring-backend.*"} / container_spec_memory_limit_bytes > 0.9
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High memory usage in Monitoring Backend"
-          description: "Memory usage is above 90% for 5 minutes."
-      
-      - alert: MonitoringBackendHighCPU
-        expr: rate(container_cpu_usage_seconds_total{pod=~"monitoring-backend.*"}[5m]) > 0.8
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High CPU usage in Monitoring Backend"
-          description: "CPU usage is above 80% for 5 minutes."
