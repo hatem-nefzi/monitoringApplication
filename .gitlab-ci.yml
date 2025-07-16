@@ -816,21 +816,22 @@ monitoring_staging_comprehensive_tests:
     - HEALTH_CHECK_RESULT=$(cat /tmp/health_check_result | cut -d'=' -f2)
 
     # Performance tests
+    - echo "=== PERFORMANCE TESTS ==="
+    - echo "Running load test against /actuator/health endpoint..."
+    - echo "ab -n 1000 -c 5 http://localhost:9090/actuator/health"
+    - ab -n 1000 -c 5 http://localhost:9090/actuator/health > ab_results.txt
     - |
-      bash -c '
-      echo "=== PERFORMANCE TESTS ==="
-      echo "Running load test on health endpoint..."
-      if ab -n 100 -c 5 -q http://localhost:9090/actuator/health > ab_results.txt 2>&1; then
-        echo "✅ Load test completed"
-        grep "Requests per second" ab_results.txt || echo "No RPS info found"
-        grep "Time per request" ab_results.txt || echo "No timing info found"
+      if grep -q "Requests per second" ab_results.txt; then
+        echo "Performance test passed"
+        grep "Requests per second" ab_results.txt
+        grep "Time per request" ab_results.txt
         echo "PERF_TEST_RESULT=true" > /tmp/perf_test_result
       else
-        echo "❌ Load test failed"
+        echo "❌ Performance test failed"
         cat ab_results.txt
         echo "PERF_TEST_RESULT=false" > /tmp/perf_test_result
       fi
-      '
+      
     - PERF_TEST_RESULT=$(cat /tmp/perf_test_result | cut -d'=' -f2)
 
     # API response validation
