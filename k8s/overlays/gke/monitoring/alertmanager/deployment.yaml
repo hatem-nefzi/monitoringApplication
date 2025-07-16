@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  labels:
+    app: alertmanager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+    spec:
+      # Init container to substitute secrets into config
+      initContainers:
+      - name: config-substitution
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args:
+        - |
+          sed -e "s/SMTP_FROM_PLACEHOLDER/$SMTP_FROM/g" \
+              -e "s/SMTP_USERNAME_PLACEHOLDER/$SMTP_AUTH_USERNAME/g" \
+              -e "s/SMTP_PASSWORD_PLACEHOLDER/$SMTP_AUTH_PASSWORD/g" \
+              -e "s/ALERT_EMAIL_PLACEHOLDER/$ALERT_EMAIL/g" \
+              /etc/alertmanager-template/alertmanager.yml > /etc/alertmanager-final/alertmanager.yml
+        env:
+        - name: SMTP_FROM
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-email-config
+              key: smtp_from
+        - name: SMTP_AUTH_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-email-config
+              key: smtp_auth_username
+        - name: SMTP_AUTH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-email-config
+              key: smtp_auth_password
+        - name: ALERT_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-email-config
+              key: alert_email
+        volumeMounts:
+        - name: config-template
+          mountPath: /etc/alertmanager-template
+        - name: config-final
+          mountPath: /etc/alertmanager-final
+      containers:
+      - name: alertmanager
+        image: prom/alertmanager:v0.27.0
+        ports:
+        - containerPort: 9093
+          name: web
+        args:
+        - --config.file=/etc/alertmanager/alertmanager.yml
+        - --storage.path=/alertmanager
+        - --web.external-url=https://alertmanager-backend.duckdns.org  # 🔧 CHANGE THIS
+        - --cluster.listen-address=0.0.0.0:9094
+        volumeMounts:
+        - name: config-final
+          mountPath: /etc/alertmanager
+        - name: storage
+          mountPath: /alertmanager
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9093
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9093
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config-template
+        configMap:
+          name: alertmanager-config
+      - name: config-final
+        emptyDir: {}
+      - name: storage
+        emptyDir: {}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
