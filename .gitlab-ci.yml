@@ -773,7 +773,7 @@ monitoring_staging_comprehensive_tests:
       done
 
     - echo "Starting port-forward..."
-    - kubectl port-forward service/monitoring-backend-service 9090:80 -n ${ENVIRONMENT} &
+    - kubectl port-forward service/monitoring-backend-service 9091:80 -n ${ENVIRONMENT} &
     - PORT_FORWARD_PID=$!
     - sleep 15
 
@@ -792,7 +792,7 @@ monitoring_staging_comprehensive_tests:
       ALL_PASSED=true
       for endpoint in "${endpoints[@]}"; do
         echo "Testing: $endpoint"
-        if response=$(curl -s -w "%{http_code}" -o /tmp/response.txt "http://localhost:9090$endpoint"); then
+        if response=$(curl -s -w "%{http_code}" -o /tmp/response.txt "http://localhost:9091$endpoint"); then
           http_code=$(echo "$response" | tail -n1)
           if [ "$http_code" -eq 200 ]; then
             echo "✅ $endpoint: HTTP $http_code"
@@ -811,7 +811,7 @@ monitoring_staging_comprehensive_tests:
 
     # --- Performance Test
     - echo "=== PERFORMANCE TEST ==="
-    - ab -n 1000 -c 5 http://localhost:9090/actuator/health > ab_results.txt
+    - ab -n 1000 -c 5 http://localhost:9091/actuator/health > ab_results.txt
     - |
       if grep -q "Requests per second" ab_results.txt; then
         echo "✅ Performance test passed"
@@ -828,7 +828,7 @@ monitoring_staging_comprehensive_tests:
     - |
       bash -c '
       echo "=== API RESPONSE VALIDATION ==="
-      if health_response=$(curl -s "http://localhost:9090/actuator/health"); then
+      if health_response=$(curl -s "http://localhost:9091/actuator/health"); then
         echo "Health response: $health_response"
         if echo "$health_response" | jq -e ".status" > /dev/null 2>&1; then
           echo "✅ Valid JSON with .status"
@@ -848,7 +848,7 @@ monitoring_staging_comprehensive_tests:
     - |
       bash -c '
       echo "=== K8S API TEST ==="
-      if pods_response=$(curl -s "http://localhost:9090/api/kubernetes/pods"); then
+      if pods_response=$(curl -s "http://localhost:9091/api/kubernetes/pods"); then
         if echo "$pods_response" | jq -e "type" > /dev/null 2>&1; then
           echo "✅ Valid JSON from pods API"
           echo "K8S_API_RESULT=true" > /tmp/k8s_api_result
@@ -867,7 +867,7 @@ monitoring_staging_comprehensive_tests:
     - |
       bash -c '
       echo "=== JVM MEMORY CHECK ==="
-      if metrics_response=$(curl -s "http://localhost:9090/actuator/metrics/jvm.memory.used"); then
+      if metrics_response=$(curl -s "http://localhost:9091/actuator/metrics/jvm.memory.used"); then
         used_memory=$(echo "$metrics_response" | jq -r ".measurements[0].value")
         if [ "$used_memory" != "null" ]; then
           echo "✅ Memory: $used_memory"
