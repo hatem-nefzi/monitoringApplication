@@ -706,15 +706,15 @@ monitoring_staging_smoke_tests:
 monitoring_staging_comprehensive_tests:
   <<: *kubectl_definition
   stage: staging-tests
-  image: jordi/ab:latest
+  image: debian:bullseye
   variables:
     ENVIRONMENT: staging
     KUBECTL_VERSION: "v1.32.3"
     KUBECONFIG: "${CI_PROJECT_DIR}/.kube/config"
-    MINIKUBE_IP: "192.168.49.2"  # Changed from HOST_IP to MINIKUBE_IP
-    MINIKUBE_PORT: "8443"        # Changed from 8888 to 8443
+    MINIKUBE_IP: "192.168.49.2"
+    MINIKUBE_PORT: "8443"
   before_script:
-    - apt-get update && apt-get install -y jq wget
+    - apt-get update && apt-get install -y curl jq wget apache2-utils
     - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
     - chmod +x kubectl && mv kubectl /usr/local/bin/
     - mkdir -p "$(dirname "$KUBECONFIG")"
@@ -724,7 +724,7 @@ monitoring_staging_comprehensive_tests:
       apiVersion: v1
       clusters:
       - cluster:
-          server: https://${MINIKUBE_IP}:${MINIKUBE_PORT}  # Changed to HTTPS
+          server: https://${MINIKUBE_IP}:${MINIKUBE_PORT}
           insecure-skip-tls-verify: true
         name: minikube
       contexts:
@@ -738,10 +738,9 @@ monitoring_staging_comprehensive_tests:
       users:
       - name: gitlab-ci
         user:
-          token: ${MINIKUBE_TOKEN}  # Added token authentication
+          token: ${MINIKUBE_TOKEN}
       EOF
-    
-    # Test the connection
+
     - echo "Testing Kubernetes connection..."
     - kubectl cluster-info
     - kubectl get nodes
@@ -750,17 +749,14 @@ monitoring_staging_comprehensive_tests:
   script:
     - echo "=== COMPREHENSIVE STAGING TESTS ==="
 
-    # Wait for pod readiness
     - echo "Waiting for monitoring-backend pod to be ready..."
     - kubectl wait --for=condition=Ready pod -l app=monitoring-backend -n ${ENVIRONMENT} --timeout=300s
 
-    # Get pod name
     - POD_NAME=$(kubectl get pods -n ${ENVIRONMENT} -l app=monitoring-backend -o jsonpath='{.items[0].metadata.name}')
     - echo "Using pod $POD_NAME"
 
-    # Wait for Spring Boot to fully start
-    - echo "Waiting for Spring Boot to fully start..."
     - |
+      echo "Waiting for Spring Boot to fully start..."
       for i in $(seq 1 60); do
         if kubectl logs $POD_NAME -n ${ENVIRONMENT} | grep -q "Started .* in .* seconds"; then
           echo "✅ Spring Boot application has started"
@@ -776,13 +772,12 @@ monitoring_staging_comprehensive_tests:
         fi
       done
 
-    # Start port-forward to the service
     - echo "Starting port-forward..."
     - kubectl port-forward service/monitoring-backend-service 9090:80 -n ${ENVIRONMENT} &
     - PORT_FORWARD_PID=$!
     - sleep 15
 
-    # Health check tests
+    # --- Health Checks
     - |
       bash -c '
       echo "=== HEALTH CHECK TESTS ==="
@@ -794,7 +789,6 @@ monitoring_staging_comprehensive_tests:
         "/api/kubernetes/pods"
         "/api/kubernetes/services"
       )
-
       ALL_PASSED=true
       for endpoint in "${endpoints[@]}"; do
         echo "Testing: $endpoint"
@@ -813,107 +807,101 @@ monitoring_staging_comprehensive_tests:
       done
       echo "HEALTH_CHECK_RESULT=$ALL_PASSED" > /tmp/health_check_result
       '
-    - HEALTH_CHECK_RESULT=$(cat /tmp/health_check_result | cut -d'=' -f2)
+    - HEALTH_CHECK_RESULT=$(cut -d'=' -f2 < /tmp/health_check_result)
 
-    # Performance tests
-    - echo "=== PERFORMANCE TESTS ==="
-    - echo "Running load test against /actuator/health endpoint..."
-    - echo "ab -n 1000 -c 5 http://localhost:9090/actuator/health"
+    # --- Performance Test
+    - echo "=== PERFORMANCE TEST ==="
     - ab -n 1000 -c 5 http://localhost:9090/actuator/health > ab_results.txt
     - |
       if grep -q "Requests per second" ab_results.txt; then
-        echo "Performance test passed"
+        echo "✅ Performance test passed"
         grep "Requests per second" ab_results.txt
-        grep "Time per request" ab_results.txt
         echo "PERF_TEST_RESULT=true" > /tmp/perf_test_result
       else
         echo "❌ Performance test failed"
         cat ab_results.txt
         echo "PERF_TEST_RESULT=false" > /tmp/perf_test_result
       fi
-      
-    - PERF_TEST_RESULT=$(cat /tmp/perf_test_result | cut -d'=' -f2)
+    - PERF_TEST_RESULT=$(cut -d'=' -f2 < /tmp/perf_test_result)
 
-    # API response validation
+    # --- API Response Validation
     - |
       bash -c '
       echo "=== API RESPONSE VALIDATION ==="
       if health_response=$(curl -s "http://localhost:9090/actuator/health"); then
         echo "Health response: $health_response"
         if echo "$health_response" | jq -e ".status" > /dev/null 2>&1; then
-          echo "✅ Health endpoint returns valid JSON with status"
+          echo "✅ Valid JSON with .status"
           echo "API_VALIDATION_RESULT=true" > /tmp/api_validation_result
         else
-          echo "❌ Health endpoint JSON structure invalid"
+          echo "❌ Invalid structure"
           echo "API_VALIDATION_RESULT=false" > /tmp/api_validation_result
         fi
       else
-        echo "❌ Failed to get health response"
+        echo "❌ Failed to get response"
         echo "API_VALIDATION_RESULT=false" > /tmp/api_validation_result
       fi
       '
-    - API_VALIDATION_RESULT=$(cat /tmp/api_validation_result | cut -d'=' -f2)
+    - API_VALIDATION_RESULT=$(cut -d'=' -f2 < /tmp/api_validation_result)
 
-    # Kubernetes API tests
+    # --- Kubernetes API Endpoint Test
     - |
       bash -c '
-      echo "=== KUBERNETES API TESTS ==="
+      echo "=== K8S API TEST ==="
       if pods_response=$(curl -s "http://localhost:9090/api/kubernetes/pods"); then
-        echo "Pods API response received"
         if echo "$pods_response" | jq -e "type" > /dev/null 2>&1; then
-          echo "✅ Pods API returns valid JSON"
+          echo "✅ Valid JSON from pods API"
           echo "K8S_API_RESULT=true" > /tmp/k8s_api_result
         else
-          echo "❌ Pods API response not valid JSON"
+          echo "❌ Malformed JSON"
           echo "K8S_API_RESULT=false" > /tmp/k8s_api_result
         fi
       else
-        echo "❌ Failed to get pods response"
+        echo "❌ Failed request"
         echo "K8S_API_RESULT=false" > /tmp/k8s_api_result
       fi
       '
-    - K8S_API_RESULT=$(cat /tmp/k8s_api_result | cut -d'=' -f2)
+    - K8S_API_RESULT=$(cut -d'=' -f2 < /tmp/k8s_api_result)
 
-    # Memory usage check
+    # --- Memory Usage Test
     - |
       bash -c '
-      echo "=== RESOURCE USAGE CHECK ==="
+      echo "=== JVM MEMORY CHECK ==="
       if metrics_response=$(curl -s "http://localhost:9090/actuator/metrics/jvm.memory.used"); then
-        echo "$metrics_response" | jq ".measurements"
         used_memory=$(echo "$metrics_response" | jq -r ".measurements[0].value")
         if [ "$used_memory" != "null" ]; then
-          echo "✅ JVM used memory: $used_memory"
+          echo "✅ Memory: $used_memory"
           echo "MEMORY_CHECK_RESULT=true" > /tmp/memory_check_result
         else
-          echo "❌ Unable to parse JVM memory usage"
+          echo "❌ Failed to parse"
           echo "MEMORY_CHECK_RESULT=false" > /tmp/memory_check_result
         fi
       else
-        echo "❌ Failed to get memory metrics"
+        echo "❌ No response"
         echo "MEMORY_CHECK_RESULT=false" > /tmp/memory_check_result
       fi
       '
-    - MEMORY_CHECK_RESULT=$(cat /tmp/memory_check_result | cut -d'=' -f2)
+    - MEMORY_CHECK_RESULT=$(cut -d'=' -f2 < /tmp/memory_check_result)
 
-    # Final verdict
+    # --- Final Verdict
     - |
       echo "=== FINAL RESULT ==="
+      echo "Health: $HEALTH_CHECK_RESULT"
+      echo "Performance: $PERF_TEST_RESULT"
+      echo "API: $API_VALIDATION_RESULT"
+      echo "K8s: $K8S_API_RESULT"
+      echo "Memory: $MEMORY_CHECK_RESULT"
       if [ "$HEALTH_CHECK_RESULT" = "true" ] && [ "$PERF_TEST_RESULT" = "true" ] && [ "$API_VALIDATION_RESULT" = "true" ] && [ "$K8S_API_RESULT" = "true" ] && [ "$MEMORY_CHECK_RESULT" = "true" ]; then
         echo "✅ ALL TESTS PASSED"
         exit 0
       else
         echo "❌ SOME TESTS FAILED"
-        echo "Health Check: $HEALTH_CHECK_RESULT"
-        echo "Performance Test: $PERF_TEST_RESULT"
-        echo "API Validation: $API_VALIDATION_RESULT"
-        echo "K8s API Test: $K8S_API_RESULT"
-        echo "Memory Check: $MEMORY_CHECK_RESULT"
         exit 1
       fi
 
   after_script:
     - echo "Cleaning up port-forward..."
-    - if [ ! -z "$PORT_FORWARD_PID" ]; then kill $PORT_FORWARD_PID 2>/dev/null || echo "Port-forward process already terminated"; fi
+    - if [ ! -z "$PORT_FORWARD_PID" ]; then kill $PORT_FORWARD_PID 2>/dev/null || echo "Already killed"; fi
 
   artifacts:
     paths:
