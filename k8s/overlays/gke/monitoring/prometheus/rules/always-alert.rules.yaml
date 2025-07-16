@@ -1,0 +1,12 @@
+# k8s/overlays/gke/monitoring/prometheus/rules/always-alert.rules
+groups:
+  - name: AlwaysFire
+    rules:
+      - alert: AlwaysFiring
+        expr: vector(1)  # always true
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "This is a test alert"
+          description: "This alert always fires to test Alertmanager integration"
