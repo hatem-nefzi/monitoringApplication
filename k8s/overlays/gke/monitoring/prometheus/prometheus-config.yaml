@@ -11,6 +11,7 @@ data:
     
     rule_files:
       - "/etc/prometheus/rules/*.yml"
+      - "/etc/prometheus/rules/*.yaml"  # ADD THIS LINE
     
     scrape_configs:
       # Prometheus itself
