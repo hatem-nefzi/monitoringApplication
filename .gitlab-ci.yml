@@ -820,7 +820,7 @@ monitoring_staging_comprehensive_tests:
       bash -c '
       echo "=== PERFORMANCE TESTS ==="
       echo "Running load test on health endpoint..."
-      if ab -n 100 -c 5 -q "http://localhost:9090/actuator/health" > ab_results.txt 2>&1; then
+      if ab -n 100 -c 5 "http://localhost:9090/actuator/health" > ab_results.txt 2>&1; then
         echo "✅ Load test completed"
         grep "Requests per second" ab_results.txt || echo "No RPS info found"
         grep "Time per request" ab_results.txt || echo "No timing info found"
