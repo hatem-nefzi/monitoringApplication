@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: prometheus-rule-always-alert
+  name: prometheus-alert-rules
   namespace: monitoring
   labels:
-    role: alert-rules
+    app: prometheus
 data:
   always-alert.rules.yaml: |
     groups:

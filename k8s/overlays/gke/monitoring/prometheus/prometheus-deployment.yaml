@@ -30,6 +30,8 @@ spec:
               mountPath: /etc/prometheus
             - name: prometheus-storage
               mountPath: /prometheus
+            - name: prometheus-alert-rules         # ✅ NEW
+              mountPath: /etc/prometheus/rules     # ✅ NEW
           resources:
             requests:
               memory: "512Mi"
@@ -43,3 +45,6 @@ spec:
             name: prometheus-config
         - name: prometheus-storage
           emptyDir: {}  # You can switch to a PVC later if needed
+        - name: prometheus-alert-rules            # ✅ NEW
+          configMap:
+            name: prometheus-alert-rules
