@@ -19,6 +19,9 @@ resources:
   - grafana/grafana-service.yaml
   # Ingress
   - ingress/monitoring-ingress.yaml
+  - ingress/alertmanager-ingress.yaml
+  # Alertmanager
+  - alertmanager
   
   
   
