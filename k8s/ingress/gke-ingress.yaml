@@ -23,3 +23,10 @@ spec:
                 name: monitoring-backend-service
                 port:
                   number: 80
+          - path: /canary  # Canary path for monitoring backend
+            pathType: Prefix
+            backend:
+              service:
+                name: monitoring-backend-canary-service
+                port:
+                  number: 80 
