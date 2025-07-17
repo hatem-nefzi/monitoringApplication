@@ -961,7 +961,7 @@ deploy_production:
   script:
     - echo "Building production manifests with Kustomize..."
     - cd k8s/overlays/production
-    - kustomize edit fix  # ensure compatibility
+    - kustomize edit fix  # ensure compatibility.
     - |
       echo "=== UPDATING IMAGE TAG FOR PRODUCTION ==="
       echo "Setting image to: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
