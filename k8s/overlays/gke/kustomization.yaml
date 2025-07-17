@@ -11,6 +11,7 @@ resources:
 patchesStrategicMerge:
   - patches/deployment-patch.yaml
   - patches/cluster-rolebinding-patch.yaml
+  - patches/deployment-canary.yaml # Canary deployment for monitoring backend
 
 images:
   - name: monitoring-backend

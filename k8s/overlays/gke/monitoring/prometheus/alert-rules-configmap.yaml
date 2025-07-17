@@ -6,15 +6,24 @@ metadata:
   labels:
     app: prometheus
 data:
-  always-alert.rules.yaml: |
+  prometheus.rules.yaml: |
     groups:
-      - name: AlwaysFire
-        rules:
-          - alert: AlwaysFiring
-            expr: vector(1)
-            for: 1m
-            labels:
-              severity: warning
-            annotations:
-              summary: "This is a test alert"
-              description: "This alert always fires to test Alertmanager integration"
+    - name: workload.rules
+      rules:
+        - alert: ModerateCPUUsage
+          expr: sum(rate(container_cpu_usage_seconds_total{container!="",pod!=""}[2m])) by (pod) > 0.2
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Moderate CPU usage detected"
+            description: "Pod {{ $labels.pod }} is using more than 20% CPU for 2 minutes."
+
+        - alert: HighMemoryUsage
+          expr: sum(container_memory_usage_bytes{container!="",pod!=""}) by (pod) > 100 * 1024 * 1024
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High memory usage detected"
+            description: "Pod {{ $labels.pod }} is using over 100MiB of memory."
