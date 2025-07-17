@@ -5,7 +5,6 @@ stages:
   - security
   - sonarqube
   - docker
-  - sast
   - docker_security
   - deploy-staging
   - staging-tests
@@ -378,8 +377,6 @@ docker_publish:
 
 
 
-include:
-  - template: Security/SAST.gitlab-ci.yml
 
 container_scan:
   <<: *job_definition
