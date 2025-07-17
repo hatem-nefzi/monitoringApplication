@@ -5,6 +5,7 @@ stages:
   - security
   - sonarqube
   - docker
+  - sast
   - docker_security
   - deploy-staging
   - staging-tests
@@ -376,6 +377,9 @@ docker_publish:
     - if: $CI_COMMIT_BRANCH == "experiment"
 
 
+
+include:
+  - template: Security/SAST.gitlab-ci.yml
 
 container_scan:
   <<: *job_definition
