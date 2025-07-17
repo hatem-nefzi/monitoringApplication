@@ -1106,7 +1106,7 @@ deploy_monitoring_backend_gke:
     - echo "Building Kustomize overlay..."
     - kustomize build k8s/overlays/gke | tee kustomize-output.yaml | kubectl apply -f -
 
-    # Ensure ManagedCertificate exists (only create if missing)
+    # Ensure ManagedCertificate exists (only create if missing).
     - echo "Ensuring ManagedCertificate exists..."
     - |
       if ! kubectl get managedcertificate monitoring-backend-ssl-cert -n "$GKE_NAMESPACE" > /dev/null 2>&1; then
