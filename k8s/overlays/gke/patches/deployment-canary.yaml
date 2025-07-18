@@ -1,38 +1,38 @@
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: monitoring-backend-canary
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: monitoring-backend
-      track: canary
-  template:
-    metadata:
-      labels:
-        app: monitoring-backend
-        track: canary
-    spec:
-      serviceAccountName: monitoring-backend
-      containers:
-      - name: monitoring-backend
-        env:
-        - name: SPRING_PROFILES_ACTIVE
-          value: "kubernetes,gke,production"
-        - name: ENVIRONMENT
-          value: "gke"
-        - name: PLATFORM
-          value: "gcp"
-        resources:
-          limits:
-            memory: "512Mi"
-            cpu: "300m"
-          requests:
-            memory: "256Mi"
-            cpu: "100m"
-      tolerations:
-      - key: "cloud.google.com/gke-spot"
-        operator: "Equal"
-        value: "true"
-        effect: "NoSchedule"
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: monitoring-backend-canary
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: monitoring-backend
+#       track: canary
+#   template:
+#     metadata:
+#       labels:
+#         app: monitoring-backend
+#         track: canary
+#     spec:
+#       serviceAccountName: monitoring-backend
+#       containers:
+#       - name: monitoring-backend
+#         env:
+#         - name: SPRING_PROFILES_ACTIVE
+#           value: "kubernetes,gke,production"
+#         - name: ENVIRONMENT
+#           value: "gke"
+#         - name: PLATFORM
+#           value: "gcp"
+#         resources:
+#           limits:
+#             memory: "512Mi"
+#             cpu: "300m"
+#           requests:
+#             memory: "256Mi"
+#             cpu: "100m"
+#       tolerations:
+#       - key: "cloud.google.com/gke-spot"
+#         operator: "Equal"
+#         value: "true"
+#         effect: "NoSchedule"
