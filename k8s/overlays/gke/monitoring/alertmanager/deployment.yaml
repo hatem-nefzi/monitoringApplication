@@ -72,7 +72,6 @@ spec:
         securityContext:
           runAsNonRoot: true
           allowPrivilegeEscalation: false
-          readonlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
         volumeMounts:
