@@ -1,3 +1,0 @@
-# k8s/overlays/gke/opa-gatekeeper/kustomization.yaml
-resources:
-  - gatekeeper-install.yaml
