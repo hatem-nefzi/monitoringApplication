@@ -5,7 +5,7 @@ namespace: monitoring-backend
 
 resources:
   - ../../base
-  - canary-service.yaml # Service for canary deployment
+  # - canary-service.yaml # Service for canary deployment
   
   
 
