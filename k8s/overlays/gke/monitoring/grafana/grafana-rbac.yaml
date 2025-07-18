@@ -12,12 +12,10 @@ rules:
 - apiGroups: [""]
   resources:
   - nodes
-  - nodes/proxy
   - services
   - endpoints
   - pods
   - configmaps
-  - secrets
   verbs: ["get", "list", "watch"]
 - apiGroups: ["extensions", "apps"]
   resources:
@@ -29,6 +27,8 @@ rules:
   resources:
   - ingresses
   verbs: ["get", "list", "watch"]
+# ❌ Removed "secrets"
+# ❌ Removed "nodes/proxy"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

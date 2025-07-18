@@ -48,6 +48,12 @@ spec:
             secretKeyRef:
               name: alertmanager-email-config
               key: alert_email
+        securityContext:
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          readonlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
         volumeMounts:
         - name: config-template
           mountPath: /etc/alertmanager-template
@@ -64,6 +70,12 @@ spec:
         - --storage.path=/alertmanager
         - --web.external-url=https://alertmanager-backend.duckdns.org  # 🔧 CHANGE THIS
         - --cluster.listen-address=0.0.0.0:9094
+        securityContext:
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          readonlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
         volumeMounts:
         - name: config-final
           mountPath: /etc/alertmanager
