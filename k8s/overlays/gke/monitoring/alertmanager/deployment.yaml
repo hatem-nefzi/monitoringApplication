@@ -23,8 +23,8 @@ spec:
         args:
         - |
           sed -e "s/SMTP_FROM_PLACEHOLDER/$SMTP_FROM/g" \
-              -e "s/SMTP_USERNAME_PLACEHOLDER/$SMTP_AUTH_USERNAME/g" \
-              -e "s/SMTP_PASSWORD_PLACEHOLDER/$SMTP_AUTH_PASSWORD/g" \
+              -e "s/SMTP_AUTH_USERNAME/$SMTP_AUTH_USERNAME/g" \
+              -e "s/SMTP_AUTH_PASSWORD/$SMTP_AUTH_PASSWORD/g" \
               -e "s/ALERT_EMAIL_PLACEHOLDER/$ALERT_EMAIL/g" \
               /etc/alertmanager-template/alertmanager.yml > /etc/alertmanager-final/alertmanager.yml
         env:

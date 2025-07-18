@@ -11,8 +11,8 @@ data:
       smtp_smarthost: 'smtp.gmail.com:587'
       smtp_hello: 'alertmanager'
       smtp_from: 'SMTP_FROM_PLACEHOLDER'  # to be replaced
-      smtp_auth_username: 'SMTP_USERNAME_PLACEHOLDER'  # to be replaced
-      smtp_auth_password: 'SMTP_PASSWORD_PLACEHOLDER'  # to be replaced
+      SMTP_AUTH_USERNAME: 'SMTP_AUTH_USERNAME'
+      SMTP_AUTH_PASSWORD: 'SMTP_AUTH_PASSWORD'
       smtp_require_tls: true
 
     route:
