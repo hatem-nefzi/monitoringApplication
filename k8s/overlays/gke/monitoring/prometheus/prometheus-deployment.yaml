@@ -34,11 +34,11 @@ spec:
               mountPath: /etc/prometheus/rules     # ✅ NEW
           resources:
             requests:
-              memory: "512Mi"
-              cpu: "250m"
+              memory: "256Mi"
+              cpu: "100m"
             limits:
-              memory: "1Gi"
-              cpu: "500m"
+              memory: "512Mi"
+              cpu: "200m"
       volumes:
         - name: prometheus-config
           configMap:
