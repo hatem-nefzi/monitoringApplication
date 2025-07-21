@@ -6,3 +6,7 @@ subjects:
 - kind: ServiceAccount
   name: monitoring-backend
   namespace: staging
+roleRef:
+  kind: ClusterRole
+  name: monitoring-backend-role
+  apiGroup: rbac.authorization.k8s.io
