@@ -191,7 +191,7 @@ variables:
           token: ${MINIKUBE_TOKEN}
       EOF
     
-    # Test the connection
+    # Test the connection.
     - echo "Testing Kubernetes connection..."
     - kubectl cluster-info
     - kubectl get nodes
