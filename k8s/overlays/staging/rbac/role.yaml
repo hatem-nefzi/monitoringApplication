@@ -4,7 +4,7 @@ metadata:
   name: metrics-reader
   namespace: staging
 rules:
-  # Metrics permissions
+  # Metrics permissions.
   - apiGroups: ["metrics.k8s.io"]
     resources: ["pods"]
     verbs: ["get", "list"]
