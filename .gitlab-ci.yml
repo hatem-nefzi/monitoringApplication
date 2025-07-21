@@ -164,7 +164,6 @@ variables:
     MINIKUBE_PORT: "8443"
     KUBECTL_VERSION: "v1.32.3"
   before_script:
-    - !reference [.monitoring_backend_deploy_base, before_script]
     - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
     - chmod +x kubectl && mv kubectl /usr/local/bin/
     - mkdir -p "$(dirname "$KUBECONFIG")"
@@ -203,7 +202,6 @@ variables:
     ENVIRONMENT: production
     KUBECONFIG: "${CI_PROJECT_DIR}/.kube/config"
   before_script:
-    - !reference [.monitoring_backend_deploy_base, before_script]
     - mkdir -p "$(dirname "$KUBECONFIG")"
     - |
       cat > "${KUBECONFIG}" <<EOF
