@@ -3,10 +3,10 @@ kind: Kustomization
 namespace: staging
 resources:
   - ../../base
-  - rbac/role.yaml
-  - rbac/rolebinding.yaml
+  
 patches:
   - path: patches/deployment-patch.yaml
+  - path: patches/cluster-rolebinding-patch.yaml
 images:
   - name: monitoring-backend
     newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
