@@ -63,14 +63,13 @@ public class KubernetesService {
         }
     }
 
-    public List<PodInfo> getPodInfo(String namespace) throws ApiException {
-        String effectiveNamespace = (namespace != null && !namespace.isBlank()) ? namespace : configuredNamespace;
-        logger.debug("Fetching pod info for namespace: {}", effectiveNamespace);
+    public List<PodInfo> getPodInfoClusterWide() throws ApiException {
+        logger.debug("Fetching pod info for all namespaces");
         try {
-            V1PodList podList = coreV1Api.listNamespacedPod(effectiveNamespace, null, null, null, null, null, null, null, null, null, null);
+            V1PodList podList = coreV1Api.listPodForAllNamespaces(null, null, null, null, null, null, null, null, null, null);
             return podList.getItems().stream().map(this::mapPodToPodInfo).collect(Collectors.toList());
         } catch (ApiException e) {
-            logger.error("Failed to fetch pods for namespace {}: {}", effectiveNamespace, e.getResponseBody(), e);
+            logger.error("Failed to fetch pods for all namespaces: {}", e.getResponseBody(), e);
             throw e;
         }
     }

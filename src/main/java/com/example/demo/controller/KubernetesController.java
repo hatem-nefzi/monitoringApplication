@@ -31,7 +31,7 @@ public class KubernetesController {
 
     @GetMapping("/")
     public String home(){
-        return "monitoring backend is alive";
+        return "monitoring backend is alive - cluster wide monitoring enabled";
     }
 
     @GetMapping("/pod-names")
@@ -54,7 +54,7 @@ public class KubernetesController {
     @GetMapping("/pods")
     public ResponseEntity<?> getPods() {
         try {
-            List<PodInfo> pods = kubernetesService.getPodInfo(namespace);
+            List<PodInfo> pods = kubernetesService.getPodInfoClusterWide();
             logger.debug("Successfully fetched {} pods", pods.size());
             return ResponseEntity.ok(Map.of(
                 "success", true,
