@@ -128,7 +128,7 @@ public ResponseEntity<Object> getPodDetails(
  @GetMapping("/deployments")
     public ResponseEntity<?> getDeployments(@RequestParam(required = false) String namespace) {
         try {
-            List<DeploymentInfo> deployments = kubernetesService.getAllDeploymentsClusterWide();
+            List<DeploymentInfo> deployments = kubernetesService.getDeployments(namespace);
             return ResponseEntity.ok(Map.of("success", true, "deployments", deployments));
         } catch (ApiException e) {
             return ResponseEntity.status(e.getCode())
