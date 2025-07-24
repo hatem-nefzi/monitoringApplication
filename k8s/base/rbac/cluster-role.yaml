@@ -4,7 +4,7 @@ metadata:
   name: monitoring-backend-role
 rules:
 - apiGroups: [""]
-  resources: ["pods", "pods/exec", "pods/log", "services"]
+  resources: ["pods", "pods/exec", "pods/log", "services", "namespaces"]
   verbs: ["get", "list"]
 - apiGroups: ["apps"]
   resources: ["deployments"]

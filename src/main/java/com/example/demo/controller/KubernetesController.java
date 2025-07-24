@@ -99,10 +99,11 @@ public ResponseEntity<Map<String, Object>> getNamespaces() {
             "namespaces", namespaces
         ));
     } catch (Exception e) {
+        logger.error("Error fetching namespaces: {}", e.getMessage(),e);
         return ResponseEntity.status(500)
             .body(Map.of(
                 "success", false,
-                "error", e.getMessage()
+                "error", e.getMessage()!=null ? e.getMessage() : "Unknown error"
             ));
     }
 }
