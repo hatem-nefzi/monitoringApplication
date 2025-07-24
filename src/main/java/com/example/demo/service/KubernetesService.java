@@ -147,10 +147,10 @@ public class KubernetesService {
                     .body(Map.of("error", "Error fetching pod details: " + e.getResponseBody()));
         }
     }
+    
 
-    public List<DeploymentInfo> getDeployments(String namespace) throws ApiException {
-        String effectiveNamespace = (namespace != null && !namespace.isBlank()) ? namespace : configuredNamespace;
-        V1DeploymentList deploymentList = appsV1Api.listNamespacedDeployment(effectiveNamespace, null, null, null, null, null, null, null, null, null, null);
+    public List<DeploymentInfo> getAllDeploymentsClusterWide() throws ApiException {
+        V1DeploymentList deploymentList = appsV1Api.listNamespacedDeployment(null, null, null, null, null, null, null, null, null, null, null);
         return deploymentList.getItems().stream().map(DeploymentInfo::new).collect(Collectors.toList());
     }
 
