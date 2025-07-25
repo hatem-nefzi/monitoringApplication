@@ -150,10 +150,15 @@ public class KubernetesService {
     
 
     public List<DeploymentInfo> getAllDeployments(String namespace) throws ApiException {
-        String effectiveNamespace = (namespace != null && !namespace.isBlank()) ? namespace : configuredNamespace;
-        V1DeploymentList deploymentList = appsV1Api.listNamespacedDeployment(effectiveNamespace, null, null, null, null, null, null, null, null, null, null);
+    if (namespace != null && !namespace.isBlank()) {
+        V1DeploymentList deploymentList = appsV1Api.listNamespacedDeployment(namespace, null, null, null, null, null, null, null, null, null, null);
+        return deploymentList.getItems().stream().map(DeploymentInfo::new).collect(Collectors.toList());
+    } else {
+        V1DeploymentList deploymentList = appsV1Api.listDeploymentForAllNamespaces(null, null, null, null, null, null, null, null, null, null);
         return deploymentList.getItems().stream().map(DeploymentInfo::new).collect(Collectors.toList());
     }
+}
+
 
     public List<ServiceInfo> getServices(String namespace) throws ApiException {
         String effectiveNamespace = (namespace != null && !namespace.isBlank()) ? namespace : configuredNamespace;
