@@ -402,7 +402,7 @@ k8s_manifest_scan:
   script:
     - echo "🔍 Scanning Kubernetes manifests for security misconfigurations..."
 
-    # Scan base (no trailing backslashes!)
+    # Scan base. (no trailing backslashes!)
     - |
       trivy config k8s/base \
         --exit-code 0 \
