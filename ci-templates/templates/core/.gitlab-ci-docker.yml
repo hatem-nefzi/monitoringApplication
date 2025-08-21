@@ -1,0 +1,47 @@
+include:
+  - local: "templates/core/.gitlab-ci-foundation.yml"
+  - local: "shared/variables/computed.yml"
+  - local: "shared/variables/global.yml"
+# Docker build/push
+
+# templates/core/.gitlab-ci-docker.yml
+# Template Docker - Build Once, Deploy Anywhere
+
+# Docker build and push - Pipeline-as-a-Platform: délégation au conteneur Docker
+docker_publish:
+  <<: *job_definition
+  stage: docker
+  image: docker:24.0
+  variables:
+    DOCKER_HOST: "unix:///var/run/docker.sock"
+    DOCKER_BUILDKIT: 1
+  needs: ["build"]
+  before_script:
+    - apk add --no-cache curl
+    - echo "Using GitLab Container Registry $CI_REGISTRY_IMAGE"
+    - echo "Commit SHA ${CI_COMMIT_SHORT_SHA}"
+  script:
+    - echo "=== BUILDING DOCKER IMAGE ==="
+    - docker build -t "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}" -t "$CI_REGISTRY_IMAGE:latest" .
+    
+    - echo "===  LOGGING INTO GITLAB CONTAINER REGISTRY ==="
+    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+    
+    - echo "===  PUSHING IMAGES ==="
+    - echo "Pushing versioned tag $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    - docker push "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    - echo "Pushing latest tag $CI_REGISTRY_IMAGE:latest"
+    - docker push "$CI_REGISTRY_IMAGE:latest"
+    
+    - echo "===  IMAGES PUSHED SUCCESSFULLY ==="
+    - echo "Versioned: $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    - echo "Latest: $CI_REGISTRY_IMAGE:latest"
+  artifacts:
+    reports:
+      # Store image details for next stages
+      dotenv: build.env
+  after_script:
+    - echo "DOCKER_IMAGE_VERSIONED=$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}" >> build.env
+    - echo "DOCKER_IMAGE_LATEST=$CI_REGISTRY_IMAGE:latest" >> build.env
+  rules:
+    - if: $CI_COMMIT_BRANCH

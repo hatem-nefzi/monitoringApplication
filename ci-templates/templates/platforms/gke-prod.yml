@@ -1,0 +1,57 @@
+# Jobs spécifiques PROD (GKE)
+
+# templates/environments/.gitlab-ci-prod.yml
+# Déploiement sur Google Kubernetes Engine (GKE)
+
+include:
+  - local: "templates/core/.gitlab-ci-foundation.yml"
+  - local: "shared/variables/gke.yml"
+  - local: "shared/variables/computed.yml"
+
+deploy:gke:
+  <<: *default_job
+  stage: deploy-gke
+  image: google/cloud-sdk:slim
+  variables:
+    KUBECONFIG: "$CI_PROJECT_DIR/.kube/gke-config"
+    OVERLAY_DIR: "k8s/overlays/gke"
+  before_script:
+    - apt-get update && apt-get install -y curl kubectl tar google-cloud-cli-gke-gcloud-auth-plugin
+    - echo "$GCP_SERVICE_ACCOUNT_KEY" | base64 -d > /tmp/gcp-key.json
+    - gcloud auth activate-service-account --key-file /tmp/gcp-key.json
+    - gcloud config set project $GCP_PROJECT_ID
+    - gcloud services enable container.googleapis.com cloudresourcemanager.googleapis.com
+    - gcloud container clusters get-credentials $GKE_CLUSTER_NAME --zone $GKE_ZONE
+    - mkdir -p "$(dirname "$KUBECONFIG")"
+  script: |
+    kubectl create namespace "$GKE_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+    kubectl delete secret gitlab-registry-secret -n ${GKE_NAMESPACE} --ignore-not-found=true
+    kubectl create secret docker-registry gitlab-registry-secret \
+      --docker-server=$CI_REGISTRY \
+      --docker-username=$CI_REGISTRY_USER \
+      --docker-password=$CI_REGISTRY_PASSWORD \
+      -n ${GKE_NAMESPACE} \
+      --dry-run=client -o yaml | kubectl apply -f -
+    cd $OVERLAY_DIR
+    kustomize edit fix || true
+    kustomize edit set image ${APP_NAME}=${IMAGE_VERSIONED}
+    kustomize build . | tee $CI_PROJECT_DIR/k8s-gke.yaml | kubectl apply -f -
+    kubectl rollout status deployment/${APP_NAME} -n ${GKE_NAMESPACE} --timeout=300s
+  after_script:
+    - rm -f /tmp/gcp-key.json
+
+
+# Déploiement Prometheus sur GKE
+deploy_prometheus_gke:
+  <<: *monitoring_gke_deploy
+  stage: deploy-gke
+  script:
+    - echo " Deploying Prometheus to GKE monitoring namespace..."
+    - kustomize build k8s/overlays/gke/monitoring | kubectl apply -f -
+    - echo " Waiting for Prometheus deployment..."
+    - kubectl rollout status deployment/prometheus -n monitoring --timeout=300s || echo "Prometheus deployment may take longer"
+    - echo "===  MONITORING RESOURCES ==="
+    - kubectl get all -n monitoring
+  rules:
+    - if: $CI_COMMIT_BRANCH
+  needs: [deploy:gke]

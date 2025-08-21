@@ -1,0 +1,42 @@
+include:
+  - local: "templates/core/.gitlab-ci-kubernetes.yml"
+  - local: "shared/variables/prod.yml"
+  - local: "shared/variables/computed.yml"
+
+deploy:production:
+  extends: .k8s_job
+  stage: deploy-production
+  variables:
+    TARGET_NAMESPACE: "$ENVIRONMENT_PRODUCTION"
+    OVERLAY_DIR: "k8s/overlays/production"
+    KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
+  before_script:
+    - *k8s_setup
+    - mkdir -p "$(dirname "$KUBECONFIG")"
+    - |
+      cat > "${KUBECONFIG}" <<EOF
+      apiVersion: v1
+      clusters:
+      - cluster:
+          server: ${K3S_SERVER}
+          certificate-authority-data: ${K3S_CA_CERT}
+        name: k3s
+      contexts:
+      - context:
+          cluster: k3s
+          user: k3s-user
+          namespace: ${ENVIRONMENT_PRODUCTION}
+        name: k3s
+      current-context: k3s
+      kind: Config
+      users:
+      - name: k3s-user
+        user:
+          client-certificate-data: ${K3S_CLIENT_CERT}
+          client-key-data: ${K3S_CLIENT_KEY}
+      EOF
+    - kubectl cluster-info
+  script:
+    - *k8s_prepare
+    - *k8s_apply_overlay
+  needs: ["smoke:staging"]

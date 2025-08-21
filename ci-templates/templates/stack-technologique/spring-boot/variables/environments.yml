@@ -1,0 +1,4 @@
+# DEPRECATED: merci d'utiliser shared/variables/{dev,prod,gke}.yml
+# Conserver temporairement pour compatibilité ascendante.
+variables:
+  _ENV_FILE_DEPRECATED: "true"

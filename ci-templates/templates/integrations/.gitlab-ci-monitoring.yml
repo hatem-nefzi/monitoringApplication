@@ -1,0 +1,23 @@
+# Prometheus/Grafana/alertmanager
+include:
+  - local: "templates/core/.gitlab-ci-foundation.yml"
+  - local: "shared/variables/staging.yml"
+
+monitoring:verify:
+  <<: *k8s_job
+  stage: monitoring-verify
+  variables:
+    TARGET_NAMESPACE: "$ENVIRONMENT_PRODUCTION"
+    PROMETHEUS_URL: "$PROMETHEUS_PRODUCTION_URL"
+  script: |
+    echo "Check Prometheus /targets for job ${APP_NAME}"
+    if curl -fsS "${PROMETHEUS_URL}/api/v1/targets" | jq -e '.data.activeTargets[]? | select(.labels.job|contains("'"${APP_NAME}"'"))' >/dev/null; then
+      echo "✅ Prometheus voit les cibles de ${APP_NAME}"
+    else
+      echo "⚠️ Cible ${APP_NAME} non détectée (attente/discovery lente ?)"
+    fi
+    kubectl get servicemonitor -A || true
+
+  needs:
+    - job: deploy:production
+      optional: false

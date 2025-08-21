@@ -1,0 +1,11 @@
+include:
+  - local: "templates/core/.gitlab-ci-foundation.yml"
+unit_tests:
+  extends: .maven_job
+  stage: test
+  needs: [ "build" ]
+  script:
+    - mvn -B -q test
+  artifacts:
+    reports:
+      junit: target/surefire-reports/*.xml

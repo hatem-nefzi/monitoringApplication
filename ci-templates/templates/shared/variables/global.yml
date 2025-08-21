@@ -1,0 +1,11 @@
+# FILE 1: shared/variables/global.yml
+# Variables globales pour tous les projets
+# =============================================================================
+
+variables:
+  GIT_DEPTH: "50"
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+  DOCKER_OPTS: "--config $CI_PROJECT_DIR/.docker"
+  # Par défaut on pousse sur GitLab Container Registry
+  REGISTRY_HOST: "$CI_REGISTRY"
+  REGISTRY_IMAGE: "$CI_REGISTRY_IMAGE"

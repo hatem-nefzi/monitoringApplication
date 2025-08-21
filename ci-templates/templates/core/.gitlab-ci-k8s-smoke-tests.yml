@@ -1,0 +1,54 @@
+.k8s_smoke_template:
+  stage: staging-tests
+  image: debian:bullseye
+  variables:
+    KUBECTL_VERSION: "v1.32.3"
+    TARGET_NAMESPACE: "$ENVIRONMENT_STAGING"
+    APP_SERVICE_NAME: "${APP_NAME}-service"
+    LOCAL_TEST_PORT: "9090"
+    SERVICE_PORT: "80"
+    SMOKE_ENDPOINTS: "/actuator/health /api/kubernetes/pods"
+    PERF_REQUESTS: "300"
+    PERF_CONCURRENCY: "5"
+    KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
+  before_script:
+    - apt-get update && apt-get install -y curl jq wget apache2-utils ca-certificates
+    - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+    - chmod +x kubectl && mv kubectl /usr/local/bin/
+    - kubectl version --client
+  script: |
+    set -euo pipefail
+    echo "⏳ wait pods ready for app=${APP_NAME} in ns=${TARGET_NAMESPACE}"
+    kubectl wait --for=condition=Ready pod -l app=${APP_NAME} -n ${TARGET_NAMESPACE} --timeout=300s
+
+    echo "🔌 port-forward ${APP_SERVICE_NAME} ${LOCAL_TEST_PORT}:${SERVICE_PORT}"
+    kubectl port-forward svc/${APP_SERVICE_NAME} ${LOCAL_TEST_PORT}:${SERVICE_PORT} -n ${TARGET_NAMESPACE} &
+    PF=$!; sleep 12
+
+    ALL_OK=true
+    for ep in ${SMOKE_ENDPOINTS}; do
+      echo "GET http://localhost:${LOCAL_TEST_PORT}${ep}"
+      if curl -fsS "http://localhost:${LOCAL_TEST_PORT}${ep}" >/dev/null; then
+        echo "✅ ${ep}"
+      else
+        echo "❌ ${ep}"
+        ALL_OK=false
+      fi
+    done
+
+    echo "🏎️ perf: ${PERF_REQUESTS} req, c=${PERF_CONCURRENCY}"
+    ab -n ${PERF_REQUESTS} -c ${PERF_CONCURRENCY} http://localhost:${LOCAL_TEST_PORT}/actuator/health > ab_results.txt || true
+    grep -E "Requests per second|Time per request" ab_results.txt || true
+
+    kill ${PF} || true
+
+    [ "${ALL_OK}" = "true" ] || (echo "❌ smoke failed"; exit 1)
+  artifacts:
+    paths: [ ab_results.txt ]
+    when: always
+
+smoke:staging:
+  extends: .k8s_smoke_template
+  stage: staging-tests
+  variables:
+    TARGET_NAMESPACE: "$ENVIRONMENT_STAGING"

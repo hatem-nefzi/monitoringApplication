@@ -1,0 +1,44 @@
+include:
+  - local: "templates/core/.gitlab-ci-kubernetes.yml"
+  - local: "shared/variables/dev.yml"
+  - local: "shared/variables/computed.yml"
+
+deploy:staging:
+  extends: .k8s_job
+  stage: deploy-staging
+  variables:
+    TARGET_NAMESPACE: "$ENVIRONMENT_STAGING"
+    OVERLAY_DIR: "k8s/overlays/staging"
+    KUBECTL_VERSION: "v1.32.3"
+    KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
+  before_script:
+    - *k8s_setup
+    - apk add --no-cache ca-certificates
+    - mkdir -p "$(dirname "$KUBECONFIG")"
+    - |
+      cat > "${KUBECONFIG}" <<EOF
+      apiVersion: v1
+      clusters:
+      - cluster:
+          server: https://${MINIKUBE_IP}:${MINIKUBE_PORT}
+          insecure-skip-tls-verify: true
+        name: minikube
+      contexts:
+      - context:
+          cluster: minikube
+          user: gitlab-ci
+          namespace: ${ENVIRONMENT_STAGING}
+        name: minikube
+      current-context: minikube
+      kind: Config
+      users:
+      - name: gitlab-ci
+        user:
+          token: ${MINIKUBE_TOKEN}
+      EOF
+    - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+    - chmod +x kubectl && mv kubectl /usr/local/bin/
+    - kubectl cluster-info
+  script:
+    - *k8s_prepare
+    - *k8s_apply_overlay

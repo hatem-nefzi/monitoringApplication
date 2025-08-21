@@ -1,0 +1,17 @@
+# =============================================================================
+# FILE 2: shared/variables/computed.yml  
+# Variables calculées dynamiquement
+# =============================================================================
+variables:
+  # 📦 Dynamic Tags
+  COMMIT_TAG: "${CI_COMMIT_SHORT_SHA}"
+  IMAGE_VERSIONED: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+  IMAGE_LATEST: "$CI_REGISTRY_IMAGE:latest"
+  # kustomize and kubectl versions
+  KUSTOMIZE_VERSION: "v5.4.3"
+  KUBECTL_VERSION: "v1.32.3"
+  # 🐳 Registry URLs (computed from CI vars)
+
+  # 📁 Paths
+  KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
+  

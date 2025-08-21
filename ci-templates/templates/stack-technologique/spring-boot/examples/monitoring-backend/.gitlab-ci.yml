@@ -1,0 +1,57 @@
+# Pinner la version de tes templates
+include:
+  - project: "my-group/gitlab-templates"
+    ref: "v1.0.0"
+    file:
+      - "shared/variables/global.yml"
+      - "shared/variables/computed.yml"
+      - "templates/spring-boot/variables/defaults.yml"
+
+      - "templates/spring-boot/.gitlab-ci-spring-boot.yml"
+
+      - "shared/variables/dev.yml"
+      - "shared/variables/prod.yml"
+      - "shared/variables/gke.yml"
+
+      - "templates/platforms/minikube-dev.yml"
+      - "templates/platforms/k3s-production.yml"
+      - "templates/integrations/monitoring/prometheus-grafana.yml"
+      - "templates/platforms/gke-production.yml"
+
+# Spécifiques au projet (override minimal)
+variables:
+  APP_NAME: "monitoring-backend"
+  APP_PORT: "9090"
+
+  # Sonar
+  SONAR_PROJECT_KEY: "monitoring-backend"
+  SONAR_PROJECT_NAME: "monitoring-backend"
+
+  # Branch policy (exemple)
+  DEPLOY_BRANCH_REGEX: "^main|experiment$"
+
+# Règles de déclenchement (optionnel)
+docker_publish:
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /$DEPLOY_BRANCH_REGEX/'
+
+deploy:staging:
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /$DEPLOY_BRANCH_REGEX/'
+staging:smoke-tests:
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /$DEPLOY_BRANCH_REGEX/'
+
+deploy:production:
+  needs: [ "staging:smoke-tests" ]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+monitoring:verify:
+  needs: [ "deploy:production" ]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+deploy:gke:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "experiment"'

@@ -1,0 +1,31 @@
+# templates/core/.gitlab-ci-build.yml
+# Template de build générique avec cache optimisé
+
+include:
+  - local: "templates/core/.gitlab-ci-foundation.yml"
+
+checkout:
+  <<: *default_job
+  stage: checkout
+  script:
+    - echo "Clean workspace"
+    - rm -rf target
+
+# Maven build job - Pipeline-as-a-Platform: délégation au conteneur Maven
+build:
+  <<: *maven_definition
+  stage: build
+  cache:
+    key: maven-${CI_PROJECT_NAME}-${CI_COMMIT_REF_SLUG}
+    paths:
+      - .m2/repository
+    policy: pull-push
+  script:
+    - echo "🔨 Building with Maven..."
+    - mvn clean package -DskipTests
+  artifacts:
+    paths:
+      - target/
+    expire_in: 1 hour
+  rules:
+    - if: $CI_COMMIT_BRANCH

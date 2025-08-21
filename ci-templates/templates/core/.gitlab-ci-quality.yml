@@ -1,0 +1,33 @@
+# SonarQube
+# templates/core/.gitlab-ci-quality.yml
+# Template d'analyse qualité avec SonarQube
+include:
+  - local: "templates/core/.gitlab-ci-foundation.yml"
+
+# SonarQube analysis - Pipeline-as-a-Platform: délégation au conteneur Maven+SonarQube
+sonarqube_scan:
+  <<: *maven_definition
+  stage: sonarqube
+  needs: ["build"]
+  variables:
+    SONAR_SCANNER_OPTS: "-Xmx1024m"
+  script:
+    - echo " Running SonarQube analysis..."
+    - >
+      mvn sonar:sonar
+      -Dsonar.projectKey=monitoring-backend
+      -Dsonar.projectName=monitoring-backend
+      -Dsonar.host.url=${SONAR_HOST_URL}
+      -Dsonar.token=${SONAR_TOKEN}
+      -Dsonar.java.binaries=target/classes
+      -Dsonar.sourceEncoding=UTF-8
+      -Dsonar.sources=src/main/java
+      -Dsonar.tests=src/test/java
+      -Dsonar.junit.reportPaths=target/surefire-reports
+  artifacts:
+    reports:
+      sonarqube: sonar-report.json
+    when: always
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH

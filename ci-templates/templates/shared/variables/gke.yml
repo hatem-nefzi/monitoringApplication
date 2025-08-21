@@ -1,0 +1,5 @@
+# GKE cloud — provide the following via CI vars
+variables:
+  GKE_NAMESPACE: "$APP_NAME"
+  USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
+  # CI vars requises : GCP_SERVICE_ACCOUNT_KEY, GCP_PROJECT_ID, GKE_CLUSTER_NAME, GKE_ZONE

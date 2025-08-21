@@ -1,0 +1,64 @@
+# Déclare les stages et les bases communes (ancres)
+stages:
+  - checkout
+  - build
+  - test
+  - security
+  - sonarqube
+  - docker
+  - docker_security
+  - deploy-staging
+  - staging-tests
+  - deploy-production
+  - monitoring-verify
+  - deploy-gke
+
+.default_job: &default_job
+  tags: [docker]
+  before_script:
+    - echo "▶ ${CI_JOB_NAME}"
+
+.maven_job: &maven_job
+  <<: *default_job
+  image: hatemnefzi/maven-docker:latest
+  variables:
+    MAVEN_OPTS: "${MAVEN_OPTS}"
+  cache:
+    key: maven
+    paths: [ .m2/repository ]
+    policy: pull-push
+
+.docker_job: &docker_job
+  <<: *default_job
+  image: docker:24.0
+  variables:
+    DOCKER_HOST: "unix:///var/run/docker.sock"
+    DOCKER_BUILDKIT: "1"
+
+.k8s_job: &k8s_job
+  <<: *default_job
+  image: alpine/k8s:1.30.0
+  variables:
+    KUSTOMIZE_VERSION: "v5.4.3"
+  before_script:
+    - apk add --no-cache curl jq bash gettext
+    - curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+    - mv kustomize /usr/local/bin/
+    - kustomize version
+
+# Kubectl job template - délégation spécialisée pour Kubernetes
+.kubectl_job: &kubectl_definition
+  <<: *job_definition
+  image: alpine/k8s:1.25.10
+  variables:
+    KUBECONFIG: /tmp/kubeconfig/config
+
+# Production job template - pour environnement K3s production
+.production_job: &production_job_definition
+  tags:
+    - production
+    - gitlab-runner-prod
+    - kubernetes
+    - minikube
+    - registry
+  

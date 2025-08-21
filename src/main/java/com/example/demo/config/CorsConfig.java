@@ -20,7 +20,7 @@ public class CorsConfig {
                             "http://localhost:4200",           // Angular dev server
                             "http://localhost:8080",           // Local frontend
                             "http://monitoring.example.com",   // Your ingress domain
-                            "http://192.168.49.2"             // Minikube IP
+                            "http://192.168.49.2" // Minikube IP
                         )
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")

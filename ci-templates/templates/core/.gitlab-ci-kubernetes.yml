@@ -1,0 +1,38 @@
+include:
+  - local: "templates/core/.gitlab-ci-foundation.yml"
+
+# ---------- Reusable shell blocks (YAML anchors) ----------
+# Install kubectl deps + kustomize once
+.k8s_setup: &k8s_setup |
+  apk add --no-cache curl jq bash gettext
+  curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+  mv kustomize /usr/local/bin/
+  kustomize version
+
+# Prepare namespace + registry secret (REGISTRY_HOST provided by shared/variables/global.yml)
+.k8s_prepare: &k8s_prepare |
+  kubectl create namespace "${TARGET_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+  kubectl delete secret ${REGISTRY_SECRET_NAME:-gitlab-registry-secret} -n ${TARGET_NAMESPACE} --ignore-not-found=true
+  kubectl create secret docker-registry ${REGISTRY_SECRET_NAME:-gitlab-registry-secret} \
+    --docker-server="$REGISTRY_HOST" \
+    --docker-username="$CI_REGISTRY_USER" \
+    --docker-password="$CI_REGISTRY_PASSWORD" \
+    -n "${TARGET_NAMESPACE}" \
+    --dry-run=client -o yaml | kubectl apply -f -
+
+# Apply overlay with the versioned image
+.k8s_apply_overlay: &k8s_apply_overlay |
+  cd "$OVERLAY_DIR"
+  kustomize edit fix || true
+  kustomize edit set image ${APP_NAME}=${IMAGE_VERSIONED}
+  kustomize build . | tee "$CI_PROJECT_DIR/k8s-${TARGET_NAMESPACE}.yaml" | kubectl apply -f -
+  kubectl rollout status deployment/${APP_NAME} -n ${TARGET_NAMESPACE} --timeout=600s
+
+# ---------- Base job you can extend ----------
+.k8s_job:
+  <<: *default_job
+  image: alpine/k8s:1.30.0
+  variables:
+    KUSTOMIZE_VERSION: "v5.4.3"
+  before_script:
+    - *k8s_setup
