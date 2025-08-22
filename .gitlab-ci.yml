@@ -433,7 +433,7 @@ verify_signatures:
     - echo "Digest to verify $IMAGE_DIGEST"
     - cosign verify "$IMAGE_DIGEST"
 
-    - echo "✅ Signature verification succeeded for digest: $IMAGE_DIGEST"
+    - echo " Signature verification succeeded for digest $IMAGE_DIGEST"
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
 
