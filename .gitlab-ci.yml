@@ -430,7 +430,7 @@ verify_signatures:
     - cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
 
     - echo "=== VERIFYING IMAGE SIGNATURE ==="
-    - echo "Digest to verify: $IMAGE_DIGEST"
+    - echo "Digest to verify $IMAGE_DIGEST"
     - cosign verify "$IMAGE_DIGEST"
 
     - echo "✅ Signature verification succeeded for digest: $IMAGE_DIGEST"
