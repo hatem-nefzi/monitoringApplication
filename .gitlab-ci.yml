@@ -403,7 +403,7 @@ sign_images:
   stage: image_signing
   needs: ["docker_publish"]
   variables:
-    COSIGN_EXPERIMENTAL: "0"   # désactive keyless
+    COSIGN_EXPERIMENTAL: "1"   # désactive keyless
   script:
     - echo "=== COSIGN LOGIN TO GITLAB REGISTRY ==="
     - cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
@@ -427,7 +427,7 @@ verify_signatures:
       artifacts: true
     - job: sign_images
   variables:
-    COSIGN_EXPERIMENTAL: "0"   # rester en mode non-keyless
+    COSIGN_EXPERIMENTAL: "1"   # rester en mode non-keyless
   script:
     - echo "=== COSIGN LOGIN TO GITLAB REGISTRY ==="
     - cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
