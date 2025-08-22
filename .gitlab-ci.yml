@@ -434,10 +434,11 @@ verify_signatures:
 
     # For keyless verification, you need to specify the certificate identity
     # This should match the identity used during signing (your email/identity from the OAuth flow)
+    # Use the correct issuer (Google) and your specific email
     - |
       cosign verify "$IMAGE_DIGEST" \
-        --certificate-identity-regexp ".*@.*" \
-        --certificate-oidc-issuer https://oauth2.sigstore.dev
+        --certificate-identity="hatemnbouali111000@gmail.com" \
+        --certificate-oidc-issuer="https://accounts.google.com"
 
     - echo " Signature verification succeeded for digest $IMAGE_DIGEST"
   rules:
