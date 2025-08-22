@@ -422,7 +422,10 @@ sign_images:
 verify_signatures:
   <<: *cosign_definition
   stage: image_verification
-  needs: ["sign_images"]
+  needs:
+    - job: docker_publish
+      artifacts: true
+    - job: sign_images
   variables:
     COSIGN_EXPERIMENTAL: "0"   # rester en mode non-keyless
   script:
