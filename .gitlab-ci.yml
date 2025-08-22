@@ -20,7 +20,7 @@ variables:
   #cosign variables
   COSIGN_VERSION: "v2.2.4"
   COSIGN_EXPERIMENTAL: 0
-  COSIGN_YES: "true"  # Auto-confirm keyless signing
+ 
   DOCKER_IMAGE: 'hatemnefzi/monitoring-backend:latest'
   MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
   DOCKER_HOST: "unix:///var/run/docker.sock"
@@ -418,30 +418,25 @@ sign_images:
     - if: $CI_COMMIT_BRANCH == "experiment"
 
 # Image verification job (runs after signing)
+# Image verification job (runs after signing)
 verify_signatures:
   <<: *cosign_definition
   stage: image_verification
   needs: ["sign_images"]
+  variables:
+    COSIGN_EXPERIMENTAL: "0"   # rester en mode non-keyless
   script:
-    - echo "=== VERIFYING IMAGE SIGNATURES ==="
-    
-    # Verify keyless signatures
-    - echo "🔍 Verifying versioned image signature..."
-    - cosign verify --certificate-identity-regexp ".*@.*" --certificate-oidc-issuer-regexp ".*" "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
-    
-    - echo "🔍 Verifying latest image signature..."
-    - cosign verify --certificate-identity-regexp ".*@.*" --certificate-oidc-issuer-regexp ".*" "$CI_REGISTRY_IMAGE:latest"
-    
-    # More secure verification with specific identity (uncomment for production)
-    # - cosign verify --certificate-identity "$GITLAB_USER_EMAIL" --certificate-oidc-issuer "https://gitlab.com" "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
-    
-    # Verify attestations
-    - echo "=== VERIFYING BUILD ATTESTATIONS ==="
-    - cosign verify-attestation --certificate-identity-regexp ".*@.*" --certificate-oidc-issuer-regexp ".*" "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}" || echo "ℹ️  No attestations found (this is optional)"
-    
-    - echo "✅ All signature verifications completed successfully!"
+    - echo "=== COSIGN LOGIN TO GITLAB REGISTRY ==="
+    - cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+
+    - echo "=== VERIFYING IMAGE SIGNATURE ==="
+    - echo "Digest to verify: $IMAGE_DIGEST"
+    - cosign verify "$IMAGE_DIGEST"
+
+    - echo "✅ Signature verification succeeded for digest: $IMAGE_DIGEST"
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
+
 
 
 
