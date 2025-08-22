@@ -19,7 +19,7 @@ stages:
 variables:
   #cosign variables
   COSIGN_VERSION: "v2.2.4"
-  COSIGN_EXPERIMENTAL: 1
+  COSIGN_EXPERIMENTAL: 0
   COSIGN_YES: "true"  # Auto-confirm keyless signing
   DOCKER_IMAGE: 'hatemnefzi/monitoring-backend:latest'
   MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
