@@ -342,6 +342,11 @@ docker_publish:
     - echo "Versioned $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
     - echo "Latest $CI_REGISTRY_IMAGE:latest"
     - echo "digest $IMAGE_DIGEST"
+  artifacts:
+    reports:
+      dotenv: build.env
+    paths:
+      - build.env
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
 
