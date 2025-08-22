@@ -432,9 +432,12 @@ verify_signatures:
     - echo "=== COSIGN LOGIN TO GITLAB REGISTRY ==="
     - cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
 
-    - echo "=== VERIFYING IMAGE SIGNATURE ==="
-    - echo "Digest to verify $IMAGE_DIGEST"
-    - cosign verify "$IMAGE_DIGEST"
+    # For keyless verification, you need to specify the certificate identity
+    # This should match the identity used during signing (your email/identity from the OAuth flow)
+    - |
+      cosign verify "$IMAGE_DIGEST" \
+        --certificate-identity-regexp ".*@.*" \
+        --certificate-oidc-issuer https://oauth2.sigstore.dev
 
     - echo " Signature verification succeeded for digest $IMAGE_DIGEST"
   rules:
