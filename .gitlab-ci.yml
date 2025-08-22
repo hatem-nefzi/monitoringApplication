@@ -390,12 +390,13 @@ k8s_manifest_scan:
 
 # New image signing job (runs after docker_publish)
 sign_images:
-  <<: *cosign_definition
+  <<: *job_definition
   stage: image_signing
+  image: debian:bullseye-slim
   needs: ["docker_publish"]  # Depends on your existing docker_publish job
   script:
     - echo "=== LOGGING INTO GITLAB CONTAINER REGISTRY ==="
-    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+    - echo "$CI_REGISTRY_PASSWORD" | cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
     
     - echo "=== SIGNING IMAGES WITH COSIGN ==="
     
