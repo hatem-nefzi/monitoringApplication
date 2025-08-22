@@ -265,8 +265,8 @@ variables:
 
 # Template for Cosign jobs
 .cosign_job: &cosign_definition
-  <<: *job_definition
-  image: alpine:latest
+  <<: *maven_definition
+  
   before_script:
     - apk add --no-cache curl wget
     - echo "Installing Cosign ${COSIGN_VERSION}..."
