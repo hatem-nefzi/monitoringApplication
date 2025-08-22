@@ -408,7 +408,7 @@ sign_images:
     - cosign sign --yes "$IMAGE_DIGEST"
 
     - echo "✅ Image signed successfully!"
-    - echo "   Digest: $IMAGE_DIGEST"
+    - echo "   Digest $IMAGE_DIGEST"
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
 
