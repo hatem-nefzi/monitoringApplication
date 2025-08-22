@@ -6,6 +6,8 @@ stages:
   - sonarqube
   - docker
   - docker_security
+  - image_signing      # Add this new stage
+  - image_verification # Add this new stage
   - deploy-staging
   - staging-tests
   - deploy-production
@@ -15,6 +17,10 @@ stages:
 
 
 variables:
+  #cosign variables
+  COSIGN_VERSION: "v2.2.4"
+  COSIGN_EXPERIMENTAL: 1
+  COSIGN_YES: "true"  # Auto-confirm keyless signing
   DOCKER_IMAGE: 'hatemnefzi/monitoring-backend:latest'
   MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
   DOCKER_HOST: "unix:///var/run/docker.sock"
@@ -257,6 +263,19 @@ variables:
     - rm -f /tmp/gcp-key.json
 
 
+# Template for Cosign jobs
+.cosign_job: &cosign_definition
+  <<: *job_definition
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl wget
+    - echo "Installing Cosign ${COSIGN_VERSION}..."
+    - wget "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+    - mv cosign-linux-amd64 /usr/local/bin/cosign
+    - chmod +x /usr/local/bin/cosign
+    - cosign version
+
+
 
 checkout:
   <<: *job_definition
@@ -420,11 +439,106 @@ k8s_manifest_scan:
   rules:
     - if: '$CI_COMMIT_BRANCH == "experiment"'
 
+# New image signing job (runs after docker_publish)
+sign_images:
+  <<: *cosign_definition
+  stage: image_signing
+  needs: ["docker_publish"]  # Depends on your existing docker_publish job
+  script:
+    - echo "=== LOGGING INTO GITLAB CONTAINER REGISTRY ==="
+    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+    
+    - echo "=== SIGNING IMAGES WITH COSIGN ==="
+    
+    # Keyless signing (uses OIDC token from GitLab)
+    - echo " Signing versioned image $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    - cosign sign --yes "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    
+    - echo " Signing latest image $CI_REGISTRY_IMAGE:latest"
+    - cosign sign --yes "$CI_REGISTRY_IMAGE:latest"
+    
+    # Generate attestation (optional but recommended)
+    - echo "=== GENERATING BUILD ATTESTATIONS ==="
+    - |
+      cosign attest --yes \
+        --predicate <(echo '{
+          "buildType": "gitlab-ci",
+          "builder": {
+            "id": "'$CI_PIPELINE_URL'"
+          },
+          "invocation": {
+            "configSource": {
+              "digest": "'$CI_COMMIT_SHA'",
+              "entryPoint": "'$CI_PROJECT_PATH'/.gitlab-ci.yml"
+            }
+          },
+          "metadata": {
+            "buildInvocationId": "'$CI_PIPELINE_ID'",
+            "completeness": {
+              "parameters": true,
+              "environment": false,
+              "materials": false
+            },
+            "reproducible": false
+          }
+        }') \
+        "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    
+    - echo "✅ Images signed successfully!"
+    - echo "   - Versioned $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    - echo "   - Latest $CI_REGISTRY_IMAGE:latest"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "experiment"
+
+# Image verification job (runs after signing)
+verify_signatures:
+  <<: *cosign_definition
+  stage: image_verification
+  needs: ["sign_images"]
+  script:
+    - echo "=== VERIFYING IMAGE SIGNATURES ==="
+    
+    # Verify keyless signatures
+    - echo "🔍 Verifying versioned image signature..."
+    - cosign verify --certificate-identity-regexp ".*@.*" --certificate-oidc-issuer-regexp ".*" "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    
+    - echo "🔍 Verifying latest image signature..."
+    - cosign verify --certificate-identity-regexp ".*@.*" --certificate-oidc-issuer-regexp ".*" "$CI_REGISTRY_IMAGE:latest"
+    
+    # More secure verification with specific identity (uncomment for production)
+    # - cosign verify --certificate-identity "$GITLAB_USER_EMAIL" --certificate-oidc-issuer "https://gitlab.com" "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    
+    # Verify attestations
+    - echo "=== VERIFYING BUILD ATTESTATIONS ==="
+    - cosign verify-attestation --certificate-identity-regexp ".*@.*" --certificate-oidc-issuer-regexp ".*" "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}" || echo "ℹ️  No attestations found (this is optional)"
+    
+    - echo "✅ All signature verifications completed successfully!"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "experiment"
+
+
 
 
 deploy_monitoring_backend_staging:
   <<: *monitoring_staging_deploy
   stage: deploy-staging
+  needs: ["verify_signatures"]
+  before_script:
+    # ADD THESE LINES TO VERIFY SIGNATURE BEFORE DEPLOYMENT
+    - apk add --no-cache curl wget
+    - wget "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+    - mv cosign-linux-amd64 /usr/local/bin/cosign
+    - chmod +x /usr/local/bin/cosign
+    
+    # Verify image signature before deployment
+    - echo "🔒 Verifying image signature before staging deployment..."
+    - cosign verify --certificate-identity-regexp ".*@.*" --certificate-oidc-issuer-regexp ".*" "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    - echo "✅ Image signature verified! Proceeding with deployment..."
+    
+    # THEN CONTINUE WITH YOUR EXISTING before_script CONTENT
+    - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+    - chmod +x kubectl && mv kubectl /usr/local/bin/
+    # ... rest of your existing before_script ...
   
   script:
     - echo "=== DEPLOYING MONITORING BACKEND TO STAGING ==="
