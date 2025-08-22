@@ -334,10 +334,14 @@ docker_publish:
     - docker push "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
     - echo "Pushing latest tag $CI_REGISTRY_IMAGE:latest"
     - docker push "$CI_REGISTRY_IMAGE:latest"
+    # ✅ Capture the digest of the pushed image
+    - IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}")
+    - echo "IMAGE_DIGEST=$IMAGE_DIGEST" >> build.env
     
     - echo "=== IMAGES PUSHED SUCCESSFULLY ==="
-    - echo "Versioned , $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
-    - echo "Latest,  $CI_REGISTRY_IMAGE:latest"
+    - echo "Versioned $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    - echo "Latest $CI_REGISTRY_IMAGE:latest"
+    - echo "digest $IMAGE_DIGEST"
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
 
@@ -392,51 +396,19 @@ k8s_manifest_scan:
 sign_images:
   <<: *cosign_definition
   stage: image_signing
-  
-  needs: ["docker_publish"]  # Depends on your existing docker_publish job
+  needs: ["docker_publish"]
+  variables:
+    COSIGN_EXPERIMENTAL: "0"   # désactive keyless
   script:
-    - echo "=== LOGGING INTO GITLAB CONTAINER REGISTRY ==="
-    - echo "$CI_REGISTRY_PASSWORD" | cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
-    
-    - echo "=== SIGNING IMAGES WITH COSIGN ==="
-    
-    # Keyless signing (uses OIDC token from GitLab)
-    - echo " Signing versioned image $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
-    - cosign sign --yes "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
-    
-    - echo " Signing latest image $CI_REGISTRY_IMAGE:latest"
-    - cosign sign --yes "$CI_REGISTRY_IMAGE:latest"
-    
-    # Generate attestation (optional but recommended)
-    - echo "=== GENERATING BUILD ATTESTATIONS ==="
-    - |
-      cosign attest --yes \
-        --predicate <(echo '{
-          "buildType": "gitlab-ci",
-          "builder": {
-            "id": "'$CI_PIPELINE_URL'"
-          },
-          "invocation": {
-            "configSource": {
-              "digest": "'$CI_COMMIT_SHA'",
-              "entryPoint": "'$CI_PROJECT_PATH'/.gitlab-ci.yml"
-            }
-          },
-          "metadata": {
-            "buildInvocationId": "'$CI_PIPELINE_ID'",
-            "completeness": {
-              "parameters": true,
-              "environment": false,
-              "materials": false
-            },
-            "reproducible": false
-          }
-        }') \
-        "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
-    
-    - echo "✅ Images signed successfully!"
-    - echo "   - Versioned $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
-    - echo "   - Latest $CI_REGISTRY_IMAGE:latest"
+    - echo "=== COSIGN LOGIN TO GITLAB REGISTRY ==="
+    - cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+
+    - echo "=== SIGNING IMAGE WITH COSIGN ==="
+    - echo "Digest to sign  $IMAGE_DIGEST"
+    - cosign sign --yes "$IMAGE_DIGEST"
+
+    - echo "✅ Image signed successfully!"
+    - echo "   Digest: $IMAGE_DIGEST"
   rules:
     - if: $CI_COMMIT_BRANCH == "experiment"
 
