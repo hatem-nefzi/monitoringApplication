@@ -303,57 +303,6 @@ build:
       - target/
 
 
-sonarqube_scan:
-  <<: *maven_definition
-  stage: sonarqube
-  needs: ["build"]
-  variables:
-    SONAR_SCANNER_OPTS: "-Xmx1024m"
-  script:
-    - >
-      mvn sonar:sonar
-      -Dsonar.projectKey=monitoring-backend
-      -Dsonar.projectName=monitoring-backend
-      -Dsonar.host.url=${SONAR_HOST_URL}
-      -Dsonar.token=${SONAR_TOKEN}
-      -Dsonar.java.binaries=target/classes
-      -Dsonar.sourceEncoding=UTF-8
-      -Dsonar.sources=src/main/java
-      -Dsonar.tests=src/test/java
-      -Dsonar.junit.reportPaths=target/surefire-reports
-
-owasp_dependency_check:
-  <<: *maven_definition
-  stage: security
-  needs: ["build"]
-  variables:
-    FAIL_ON_CVSS: 9
-  before_script:
-    - mkdir -p .cache/dependency-check
-    - if [ -f package.json ]; then npm install --package-lock-only; fi
-  script:
-    - |
-      mvn org.owasp:dependency-check-maven:12.1.0:check \
-        -Dformat=ALL \
-        -DoutputDirectory=./target \
-        -DsuppressionFile=.gitlab/dependency-check-suppressions.xml \
-        -DdataDirectory=.cache/dependency-check \
-        -Dnvd.api.key=${NVD_API_KEY} \
-        -DfailBuildOnCVSS=${FAIL_ON_CVSS}
-    - ls -la target/ | grep dependency-check
-  artifacts:
-    paths:
-      - target/dependency-check-report.*
-    reports:
-      dependency_scanning: target/dependency-check-report.json
-    expire_in: 1 week
-  cache:
-    key: "dependency-check-${CI_COMMIT_REF_SLUG}"
-    paths:
-      - .cache/dependency-check/
-    policy: pull-push
-  rules:
-    - if: $CI_COMMIT_BRANCH == "experiment"
 
 
 

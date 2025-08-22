@@ -14,9 +14,7 @@ RUN ./mvnw clean package -DskipTests && rm -rf ~/.m2
 FROM openjdk:25-jdk-slim
 WORKDIR /app
 
-# Créer un utilisateur non-root avec UID 1001
-RUN addgroup --system appgroup && \
-    adduser --system --ingroup appgroup --uid 1001 appuser
+
 
 COPY --from=builder /app/target/monitoring-app-0.0.1-SNAPSHOT.jar app.jar
 
