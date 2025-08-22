@@ -268,7 +268,7 @@ variables:
   <<: *maven_definition
   
   before_script:
-    - apt-get add --no-cache curl wget
+    - apt-get update && apt-get install -y curl wget
     - echo "Installing Cosign ${COSIGN_VERSION}..."
     - wget "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
     - mv cosign-linux-amd64 /usr/local/bin/cosign
