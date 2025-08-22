@@ -451,14 +451,19 @@ verify_signatures:
 deploy_monitoring_backend_staging:
   <<: *monitoring_staging_deploy
   stage: deploy-staging
-  needs: ["verify_signatures"]
+  needs: 
+    - job: docker_publish
+      artifacts: true
+    - job: verify_signatures
   before_script:
     # ADD THESE LINES TO VERIFY SIGNATURE BEFORE DEPLOYMENT
     - apk add --no-cache curl wget
     - wget "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
     - mv cosign-linux-amd64 /usr/local/bin/cosign
     - chmod +x /usr/local/bin/cosign
-    
+    # LOGIN TO REGISTRY (THIS WAS MISSING!)
+    - echo "🔐 Logging into GitLab Container Registry..."
+    - cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
     # Verify image signature before deployment
     - echo "🔒 Verifying image signature before staging deployment..."
     - cosign verify --certificate-identity-regexp ".*@.*" --certificate-oidc-issuer-regexp ".*" "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
