@@ -21,7 +21,7 @@
         <java.version>17</java.version>
         <kubernetes-client.version>18.0.0</kubernetes-client.version>
         <snakeyaml.version>2.0</snakeyaml.version>
-        <tomcat.version>10.1.42</tomcat.version>
+        <tomcat.version>10.1.44</tomcat.version>
     </properties>
 
     <dependencies>
