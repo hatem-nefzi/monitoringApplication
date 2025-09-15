@@ -110,7 +110,7 @@ variables:
 # Image signing job - ready to use
 sign_image:
   extends: .cosign_base
-  stage: dcoker_security
+  stage: docker_security
   needs: ["docker_publish","container_scan"]
   variables:
     CERTIFICATE_IDENTITY: "${PROJECT_CERT_IDENTITY:-${DEFAULT_CERT_IDENTITY}}"
