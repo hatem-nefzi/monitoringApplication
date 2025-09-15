@@ -26,8 +26,8 @@ deploy:gke:
     - gcloud container clusters get-credentials $GKE_CLUSTER_NAME --zone $GKE_ZONE
     - mkdir -p "$(dirname "$KUBECONFIG")"
   script: |
-    - *k8s_prepare
-    - *k8s_apply_overlay
+    - eval "$K8S_PREPARE_SCRIPT"
+    - eval "$K8S_APPLY_OVERLAY_SCRIPT"
   after_script:
     - rm -f /tmp/gcp-key.json
 
@@ -42,8 +42,8 @@ deploy_monitoring_gke:
     OVERLAY_DIR: "k8s/overlays/gke/monitoring"
     TARGET_NAMESPACE: "$GKE_MONITORING_NAMESPACE"
   script:
-    - *k8s_prepare
-    - *k8s_apply_monitoring_overlay
+    - eval "$K8S_PREPARE_SCRIPT"
+    - eval "$K8S_APPLY_MONITORING_OVERLAY_SCRIPT"
   rules:
     - if: $CI_COMMIT_BRANCH
   needs: [deploy:gke]
