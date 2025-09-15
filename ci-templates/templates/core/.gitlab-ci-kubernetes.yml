@@ -30,7 +30,7 @@ include:
 
 # ---------- Base job you can extend ----------
 .k8s_job:
-  extends: *default_job
+  extends: .default_job
   image: alpine/k8s:1.30.0
   variables:
     KUSTOMIZE_VERSION: "v5.4.3"
