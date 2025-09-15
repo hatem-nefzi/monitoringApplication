@@ -43,7 +43,7 @@ owasp_dependency_check:
 
 # Container security scan - Pipeline-as-a-Platform: délégation au conteneur Trivy
 container_scan:
-  extends: .job_definition
+  extends: .default_job
   stage: docker_security
   image:
     name: aquasec/trivy:latest
@@ -63,7 +63,7 @@ container_scan:
 
 # Kubernetes manifest scan - Pipeline-as-a-Platform: délégation au conteneur Trivy Config
 k8s_manifest_scan:
-  extends: .job_definition
+  extends: .default_job
   stage: docker_security
   image:
     name: aquasec/trivy:latest
