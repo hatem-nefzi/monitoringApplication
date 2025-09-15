@@ -9,7 +9,7 @@ include:
 
 # Docker build and push - Pipeline-as-a-Platform: délégation au conteneur Docker
 docker_publish:
-  extends: .job_definition
+  extends: .default_job
   stage: docker
   image: docker:24.0
   variables:
