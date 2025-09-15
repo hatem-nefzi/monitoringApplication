@@ -109,7 +109,7 @@ variables:
 
 # Image signing job - ready to use
 sign_image:
-  extends: .cosign_base
+  extends: .default_job
   stage: image_signing
   needs: ["docker_publish","container_scan"]
   variables:
@@ -124,7 +124,7 @@ sign_image:
 
 # Image verification job - ready to use  
 verify_image:
-  extends: .cosign_base
+  extends: .default_job
   stage: image_verification
   needs: ["docker_publish", "sign_image"]
   variables:
