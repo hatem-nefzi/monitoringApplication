@@ -1,10 +1,4 @@
-# SonarQube
-# templates/core/.gitlab-ci-quality.yml
-# Template d'analyse qualité avec SonarQube
-include:
-  - local: "ci-templates/templates/core/.gitlab-ci-foundation.yml"
-
-# SonarQube analysis - Pipeline-as-a-Platform: délégation au conteneur Maven+SonarQube
+# Alternative: If you need to store SonarQube files as artifacts
 sonarqube_scan:
   extends: .maven_job
   stage: sonarqube
@@ -12,7 +6,7 @@ sonarqube_scan:
   variables:
     SONAR_SCANNER_OPTS: "-Xmx1024m"
   script:
-    - echo " Running SonarQube analysis..."
+    - echo "Running SonarQube analysis..."
     - >
       mvn sonar:sonar
       -Dsonar.projectKey=monitoring-backend
@@ -25,8 +19,10 @@ sonarqube_scan:
       -Dsonar.tests=src/test/java
       -Dsonar.junit.reportPaths=target/surefire-reports
   artifacts:
-    reports:
-      sonarqube: sonar-report.json
+    paths:
+      - "target/sonar/**/*"  # SonarQube working directory
+      - ".scannerwork/**/*"  # Scanner working directory
+    expire_in: 1 day
     when: always
   allow_failure: true
   rules:
