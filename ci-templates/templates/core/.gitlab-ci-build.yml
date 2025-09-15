@@ -11,10 +11,10 @@ build:
     # Explicitly set MAVEN_OPTS to avoid the variable resolution issue
     MAVEN_OPTS: "-Xmx1024m -Xms512m"
   before_script:
-    - echo "Current working directory: $(pwd)"
-    - echo "Java version: $(java -version)"
-    - echo "Maven version: $(mvn -version)"
-    - echo "MAVEN_OPTS: ${MAVEN_OPTS}"
+    - echo "Current working directory $(pwd)"
+    - echo "Java version $(java -version)"
+    - echo "Maven version $(mvn -version)"
+    - echo "MAVEN_OPTS ${MAVEN_OPTS}"
     # Verify pom.xml exists
     - ls -la
     - |
