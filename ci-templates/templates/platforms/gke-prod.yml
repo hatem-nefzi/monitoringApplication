@@ -4,10 +4,10 @@
 # Déploiement sur Google Kubernetes Engine (GKE)
 
 include:
-  - local: "templates/core/.gitlab-ci-foundation.yml"
-  - local: "shared/variables/gke.yml"
-  - local: "shared/variables/computed.yml"
-  - local: "templates/core/.gitlab-ci-kubernetes.yml"
+  - local: "ci-templates/templates/core/.gitlab-ci-foundation.yml"
+  - local: "ci-templates/templates/shared/variables/gke.yml"
+  - local: "ci-templates/templates/shared/variables/computed.yml"
+  - local: "ci-templates/templates/core/.gitlab-ci-kubernetes.yml"
 
 deploy:gke:
   extends: .k8s_job
