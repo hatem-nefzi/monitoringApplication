@@ -1,7 +1,7 @@
 include:
-  - local: "templates/core/.gitlab-ci-kubernetes.yml"
-  - local: "shared/variables/dev.yml"
-  - local: "shared/variables/computed.yml"
+  - local: "ci-templates/templates/core/.gitlab-ci-kubernetes.yml"
+  - local: "ci-templates/templates/shared/variables/dev.yml"
+  - local: "ci-templates/templates/shared/variables/computed.yml"
 
 deploy:dev:
   extends: .k8s_job
