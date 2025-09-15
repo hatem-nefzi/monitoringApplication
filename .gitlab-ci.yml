@@ -1,15 +1,14 @@
 include:
-  - local: 'shared/variables/global.yml'
-  - local: 'shared/variables/computed.yml'
+  - local: 'ci-templates/templates/shared/variables/global.yml'
+  - local: 'ci-templates/templates/shared/variables/computed.yml'
   # template springboot incluse
-  - local: 'templates/spring-boot/.gitlab-ci-spring-boot.yml'
-  - local: 'shared/variables/dev.yml'
-  - local: 'shared/variables/prod.yml'
-  - local: 'shared/variables/gke.yml'
-  - local: 'templates/platforms/minikube-dev.yml'
-  - local: 'templates/platforms/k3s-staging.yml'
-  - local: 'templates/integrations/monitoring/prometheus-grafana.yml'
-  - local: 'templates/platforms/gke-production.yml'
+  - local: 'ci-templates/templates/spring-boot/.gitlab-ci-spring-boot.yml'
+  - local: 'ci-templates/templates/shared/variables/dev.yml'
+  - local: 'ci-templates/templates/shared/variables/prod.yml'
+  - local: 'ci-templates/templates/shared/variables/gke.yml'
+  - local: 'ci-templates/templates/platforms/minikube-dev.yml'
+  - local: 'ci-templates/templates/platforms/k3s-staging.yml'
+  - local: 'ci-templates/templates/platforms/gke-production.yml'
 
 # Spécifiques au projet (override minimal)
 variables:
