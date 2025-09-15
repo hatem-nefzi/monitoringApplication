@@ -19,7 +19,7 @@ stages:
     - echo "▶ ${CI_JOB_NAME}"
 
 .maven_job: &maven_job
-  <<: *default_job # Héritage du default_job
+  <<: *default_job  # Héritage du default_job
   image: hatemnefzi/maven-docker:latest
   variables:
     MAVEN_OPTS: "${MAVEN_OPTS}"
@@ -47,21 +47,18 @@ stages:
     - kustomize version
 
 # Kubectl job template - délégation spécialisée pour Kubernetes
-.kubectl_job: &kubectl_job
+.kubectl_job: &kubectl_definition
   <<: *default_job
   image: alpine/k8s:1.25.10
   variables:
     KUBECONFIG: /tmp/kubeconfig/config
 
 # Production job template - pour environnement K3s production
-.production_job: &production_job
+.production_job: &production_job_definition
   tags:
     - production
     - gitlab-runner-prod
     - kubernetes
     - minikube
     - registry
-
-# Generic job definition (if you need it for extends)
-.job_definition: &job_definition
-  <<: *default_job
+  
