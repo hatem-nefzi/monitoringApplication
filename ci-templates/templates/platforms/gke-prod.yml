@@ -34,8 +34,9 @@ deploy:gke:
 # Déploiement de la stack de monitoring sur GKE
 # Utilise le namespace défini dans shared/variables/gke.yml
 deploy_monitoring_gke:
-  <<: *default_job
-  extends: .k8s_job
+  extends:
+    - .default_job
+    - .k8s_job
   stage: deploy-gke
   variables:
     OVERLAY_DIR: "k8s/overlays/gke/monitoring"
