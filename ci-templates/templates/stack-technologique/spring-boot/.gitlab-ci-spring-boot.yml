@@ -9,7 +9,7 @@ include:
   - local: 'ci-templates/templates/core/.gitlab-ci-tests.yml'
   - local: 'ci-templates/templates/core/.gitlab-ci-kubernetes.yml'
   # Variables Spring Boot
-  - local: 'ci-templates/templates/shared/variables/spring-boot-defaults.yml'
+  - local: 'ci-templates/templates/stack-technologique/spring-boot/variables/defaults.yml'
 
 # === JOBS SPÉCIFIQUES SPRING BOOT ===
 # (Seulement ce qui est vraiment spécifique)
