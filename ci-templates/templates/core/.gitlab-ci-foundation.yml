@@ -13,6 +13,10 @@ stages:
   - monitoring-verify
   - deploy-gke
 
+variables:
+  MAVEN_OPTS: "-Xmx1024m -Xms512m"
+
+
 .default_job: &default_job
   tags: [docker]
   before_script:
