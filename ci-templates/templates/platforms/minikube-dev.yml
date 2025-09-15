@@ -12,7 +12,7 @@ deploy:dev:
     KUBECTL_VERSION: "v1.32.3"
     KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
   before_script:
-    - *k8s_setup
+    - !reference [.k8s_setup_script, script]
     - apk add --no-cache ca-certificates
     - mkdir -p "$(dirname "$KUBECONFIG")"
     - |
@@ -40,5 +40,5 @@ deploy:dev:
     - chmod +x kubectl && mv kubectl /usr/local/bin/
     - kubectl cluster-info
   script:
-    - *k8s_prepare
-    - *k8s_apply_overlay
+    - !reference [.k8s_prepare_script, script]
+    - !reference [.k8s_apply_overlay_script, script]
