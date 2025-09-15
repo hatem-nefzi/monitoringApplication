@@ -97,6 +97,7 @@ variables:
 
 # Base Cosign setup
 .cosign_base:
+  tags: [docker]
   image: hatemnefzi/maven-docker:latest
   variables:
     DOCKER_TLS_CERTDIR: ""
