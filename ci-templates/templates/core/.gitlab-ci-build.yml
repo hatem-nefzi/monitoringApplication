@@ -1,13 +1,29 @@
 # templates/core/.gitlab-ci-build.yml
 # Template de build générique avec cache optimisé
-
 include:
   - local: "ci-templates/templates/core/.gitlab-ci-foundation.yml"
+
 # Maven build job - Pipeline-as-a-Platform: délégation au conteneur Maven
 build:
   extends: .maven_job
   stage: build
+  variables:
+    # Explicitly set MAVEN_OPTS to avoid the variable resolution issue
+    MAVEN_OPTS: "-Xmx1024m -Xms512m"
+  before_script:
+    - echo "Current working directory: $(pwd)"
+    - echo "Java version: $(java -version)"
+    - echo "Maven version: $(mvn -version)"
+    - echo "MAVEN_OPTS: ${MAVEN_OPTS}"
+    # Verify pom.xml exists
+    - ls -la
+    - |
+      if [ ! -f pom.xml ]; then
+        echo "ERROR: pom.xml not found in current directory!"
+        exit 1
+      fi
   script:
+    - echo "▶ ${CI_JOB_NAME}"
     - mvn clean package -DskipTests
   artifacts:
     paths:
