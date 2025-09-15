@@ -50,8 +50,8 @@ container_scan:
     entrypoint: [""]
   needs: ["docker_publish"]
   script:
-    - echo "🔍 Scanning container image for vulnerabilities..."
-    - echo "Image: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+    - echo " Scanning container image for vulnerabilities..."
+    - echo "Image $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
     - trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --insecure --output gl-container-scanning-report.json "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
   artifacts:
     reports:
