@@ -1,7 +1,7 @@
 # Alternative: If you need to store SonarQube files as artifacts
 sonarqube_scan:
   extends: .maven_job
-  stage: sonarqube
+  stage: security
   needs: ["build"]
   variables:
     SONAR_SCANNER_OPTS: "-Xmx1024m"
