@@ -16,7 +16,7 @@ sonarqube_scan:
       -Dsonar.java.binaries=target/classes
       -Dsonar.sourceEncoding=UTF-8
       -Dsonar.sources=src/main/java
-      -Dsonar.tests=src/test/java
+      -Dsonar.tests=""
       -Dsonar.junit.reportPaths=target/surefire-reports
   artifacts:
     paths:
