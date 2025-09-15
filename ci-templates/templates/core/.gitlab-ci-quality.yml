@@ -21,7 +21,7 @@ sonarqube_scan:
   artifacts:
     paths:
       - "target/sonar/**/*"  # SonarQube working directory
-      - ".scannerwork/**/*"  # Scanner working directory
+      - ".scannerwork/**/*"  # Scanner working directory.
     expire_in: 1 day
     when: always
   allow_failure: true
