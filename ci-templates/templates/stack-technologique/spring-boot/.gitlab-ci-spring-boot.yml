@@ -1,4 +1,4 @@
-# templates/spring-boot/.gitlab-ci-spring-boot.yml
+# ci-templates/templates/stack-technologique/spring-boot/.gitlab-ci-spring-boot.yml
 include:
   # Core templates
   - local: 'ci-templates/templates/core/.gitlab-ci-foundation.yml'
