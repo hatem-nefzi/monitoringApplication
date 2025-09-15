@@ -1,7 +1,7 @@
 include:
-  - local: "templates/core/.gitlab-ci-foundation.yml"
-  - local: "shared/variables/computed.yml"
-  - local: "shared/variables/global.yml"
+  - local: "ci-templates/templates/core/.gitlab-ci-foundation.yml"
+  - local: "ci-templates/templates/shared/variables/computed.yml"
+  - local: "ci-templates/templates/shared/variables/global.yml"
 # Docker build/push
 
 # templates/core/.gitlab-ci-docker.yml

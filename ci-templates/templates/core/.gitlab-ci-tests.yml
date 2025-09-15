@@ -1,5 +1,5 @@
 include:
-  - local: "templates/core/.gitlab-ci-foundation.yml"
+  - local: "ci-templates/templates/core/.gitlab-ci-foundation.yml"
 unit_tests:
   extends: .maven_job
   stage: test

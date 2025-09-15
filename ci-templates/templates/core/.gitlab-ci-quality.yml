@@ -2,7 +2,7 @@
 # templates/core/.gitlab-ci-quality.yml
 # Template d'analyse qualité avec SonarQube
 include:
-  - local: "templates/core/.gitlab-ci-foundation.yml"
+  - local: "ci-templates/templates/core/.gitlab-ci-foundation.yml"
 
 # SonarQube analysis - Pipeline-as-a-Platform: délégation au conteneur Maven+SonarQube
 sonarqube_scan:

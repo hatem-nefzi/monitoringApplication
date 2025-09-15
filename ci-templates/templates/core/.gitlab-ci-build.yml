@@ -2,7 +2,7 @@
 # Template de build générique avec cache optimisé
 
 include:
-  - local: "templates/core/.gitlab-ci-foundation.yml"
+  - local: "ci-templates/templates/core/.gitlab-ci-foundation.yml"
 # Maven build job - Pipeline-as-a-Platform: délégation au conteneur Maven
 build:
   extends: *maven_job
