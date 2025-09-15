@@ -8,7 +8,7 @@ include:
 
 # OWASP Dependency Check - Pipeline-as-a-Platform: délégation au conteneur Maven+OWASP
 owasp_dependency_check:
-  extends: .maven_definition
+  extends: .maven_job
   stage: security
   needs: ["build"]
   variables:
