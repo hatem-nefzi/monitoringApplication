@@ -1,21 +1,21 @@
 include:
-  - local: "templates/core/.gitlab-ci-kubernetes.yml"
-  - local: "shared/variables/staging.yml"
-  - local: "shared/variables/computed.yml"
-  - local: "templates/core/.gitlab-ci-security.yml"  # Pour sign_image et verify_image
+  - local: "ci-templates/templates/core/.gitlab-ci-kubernetes.yml"
+  - local: "ci-templates/templates/shared/variables/staging.yml"
+  - local: "ci-templates/templates/shared/variables/computed.yml"
+  - local: "ci-templates/templates/shared/variables/k8s-scripts.yml"
+  - local: "ci-templates/templates/core/.gitlab-ci-security.yml" # Pour sign_image et verify_image
 
 deploy:staging:
-  extends: 
+  extends:
     - .k8s_job
     - .verify_before_deploy
-  
   stage: deploy-staging
   variables:
     TARGET_NAMESPACE: "$ENVIRONMENT_STAGING"
     OVERLAY_DIR: "k8s/overlays/staging"
     KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
   before_script:
-    - *k8s_setup
+    - eval "$K8S_SETUP_SCRIPT"
     - mkdir -p "$(dirname "$KUBECONFIG")"
     - |
       cat > "${KUBECONFIG}" <<EOF
@@ -41,6 +41,6 @@ deploy:staging:
       EOF
     - kubectl cluster-info
   script:
-    - *k8s_prepare
-    - *k8s_apply_overlay
+    - eval "$K8S_PREPARE_SCRIPT"
+    - eval "$K8S_APPLY_OVERLAY_SCRIPT"
   needs: ["verify_image"]
