@@ -3,25 +3,11 @@
 
 include:
   - local: "templates/core/.gitlab-ci-foundation.yml"
-
-checkout:
-  <<: *default_job
-  stage: checkout
-  script:
-    - echo "Clean workspace"
-    - rm -rf target
-
 # Maven build job - Pipeline-as-a-Platform: délégation au conteneur Maven
 build:
-  <<: *maven_definition
+  extends: *maven_job
   stage: build
-  cache:
-    key: maven-${CI_PROJECT_NAME}-${CI_COMMIT_REF_SLUG}
-    paths:
-      - .m2/repository
-    policy: pull-push
   script:
-    - echo "🔨 Building with Maven..."
     - mvn clean package -DskipTests
   artifacts:
     paths:

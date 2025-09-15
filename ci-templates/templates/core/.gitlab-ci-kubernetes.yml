@@ -30,9 +30,17 @@ include:
 
 # ---------- Base job you can extend ----------
 .k8s_job:
-  <<: *default_job
+  extends: *default_job
   image: alpine/k8s:1.30.0
   variables:
     KUSTOMIZE_VERSION: "v5.4.3"
   before_script:
     - *k8s_setup
+
+
+# Apply overlay for monitoring stack (no image tagging, fixed namespace), on peut ajouter alertmanager ...
+.k8s_apply_monitoring_overlay: &k8s_apply_monitoring_overlay |
+  cd "$OVERLAY_DIR"
+  kustomize build . | kubectl apply -f -
+  kubectl rollout status deployment/prometheus -n ${GKE_MONITORING_NAMESPACE} --timeout=600s || echo "Prometheus rollout may take longer"
+  kubectl rollout status deployment/grafana -n ${GKE_MONITORING_NAMESPACE} --timeout=600s || echo "Grafana rollout may take longer"

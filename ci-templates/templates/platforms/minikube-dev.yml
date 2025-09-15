@@ -3,12 +3,12 @@ include:
   - local: "shared/variables/dev.yml"
   - local: "shared/variables/computed.yml"
 
-deploy:staging:
+deploy:dev:
   extends: .k8s_job
-  stage: deploy-staging
+  stage: deploy-dev
   variables:
-    TARGET_NAMESPACE: "$ENVIRONMENT_STAGING"
-    OVERLAY_DIR: "k8s/overlays/staging"
+    TARGET_NAMESPACE: "$ENVIRONMENT_DEV"
+    OVERLAY_DIR: "k8s/overlays/development"
     KUBECTL_VERSION: "v1.32.3"
     KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
   before_script:

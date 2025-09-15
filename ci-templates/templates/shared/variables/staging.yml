@@ -1,6 +1,6 @@
-# K3s production — provide K3S_* (server/certs/keys) as CI masked vars
+# K3s staging — provide K3S_* (server/certs/keys) as CI masked vars
 variables:
-  ENVIRONMENT_PRODUCTION: "production"
-  PROMETHEUS_PRODUCTION_URL: "http://prometheus.production.local"
-  GRAFANA_PRODUCTION_URL: "http://grafana.production.local"
+  ENVIRONMENT_STAGING: "staging"
+  PROMETHEUS_STAGING_URL: "http://prometheus.staging.local"
+  GRAFANA_STAGING_URL: "http://grafana.staging.local"
   # K3S_* en CI vars : K3S_SERVER, K3S_CA_CERT, K3S_CLIENT_CERT, K3S_CLIENT_KEY

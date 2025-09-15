@@ -1,9 +1,9 @@
 # Minikube (staging stage) — non-secrets only. Tokens/endpoints via CI vars.
 
 variables:
-  ENVIRONMENT_STAGING: "staging"
+  ENVIRONMENT_DEV: "development"
   MINIKUBE_IP: "192.168.49.2"
   MINIKUBE_PORT: "8443"
-  PROMETHEUS_STAGING_URL: "http://$MINIKUBE_IP:30090"
-  GRAFANA_STAGING_URL: "http://$MINIKUBE_IP:30080"
+  PROMETHEUS_DEV_URL: "http://$MINIKUBE_IP:30090"
+  GRAFANA_DEV_URL: "http://$MINIKUBE_IP:30080"
   # Token Minikube en CI var: MINIKUBE_TOKEN

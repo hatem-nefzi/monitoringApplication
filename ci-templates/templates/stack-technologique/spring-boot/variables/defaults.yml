@@ -5,7 +5,13 @@ variables:
   APP_HEALTH_PATH: "/actuator/health"
   SONAR_PROJECT_KEY: "$CI_PROJECT_PATH_SLUG"
   SONAR_PROJECT_NAME: "$CI_PROJECT_NAME"
-
+# Security defaults for Spring Boot projects
+  DEFAULT_CERT_IDENTITY: ".*@company\\.com"
+  CERTIFICATE_OIDC_ISSUER: "https://accounts.google.com"
+  
+  # Cosign configuration
+  COSIGN_VERSION: "v2.2.4"
+  COSIGN_EXPERIMENTAL: "1"
 
   
  

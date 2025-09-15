@@ -19,7 +19,7 @@ stages:
     - echo "▶ ${CI_JOB_NAME}"
 
 .maven_job: &maven_job
-  <<: *default_job
+  <<: *default_job  # Héritage du default_job
   image: hatemnefzi/maven-docker:latest
   variables:
     MAVEN_OPTS: "${MAVEN_OPTS}"

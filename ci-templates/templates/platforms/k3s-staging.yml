@@ -1,14 +1,18 @@
 include:
   - local: "templates/core/.gitlab-ci-kubernetes.yml"
-  - local: "shared/variables/prod.yml"
+  - local: "shared/variables/staging.yml"
   - local: "shared/variables/computed.yml"
+  - local: "templates/core/.gitlab-ci-security.yml"  # Pour sign_image et verify_image
 
-deploy:production:
-  extends: .k8s_job
-  stage: deploy-production
+deploy:staging:
+  extends: 
+    - .k8s_job
+    - .verify_before_deploy
+  
+  stage: deploy-staging
   variables:
-    TARGET_NAMESPACE: "$ENVIRONMENT_PRODUCTION"
-    OVERLAY_DIR: "k8s/overlays/production"
+    TARGET_NAMESPACE: "$ENVIRONMENT_STAGING"
+    OVERLAY_DIR: "k8s/overlays/staging"
     KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
   before_script:
     - *k8s_setup
@@ -39,4 +43,4 @@ deploy:production:
   script:
     - *k8s_prepare
     - *k8s_apply_overlay
-  needs: ["smoke:staging"]
+  needs: ["verify_image"]

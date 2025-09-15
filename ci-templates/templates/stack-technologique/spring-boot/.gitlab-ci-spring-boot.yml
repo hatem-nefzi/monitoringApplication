@@ -1,27 +1,22 @@
-# Template principal Spring Boot
 # templates/spring-boot/.gitlab-ci-spring-boot.yml
-# Template principal Spring Boot - inclut tous les templates nécessaires
-
 include:
-  # Core templates - Pipeline-as-a-Platform foundation
+  # Core templates 
   - project: 'demo/ci-templates'
     ref: 'main'
-    file: 
+    file:
       - '/templates/core/.gitlab-ci-foundation.yml'
       - '/templates/core/.gitlab-ci-build.yml'
       - '/templates/core/.gitlab-ci-quality.yml'
       - '/templates/core/.gitlab-ci-security.yml'
       - '/templates/core/.gitlab-ci-docker.yml'
-      - 'templates/core/.gitlab-ci-tests.ym'
-      - '/templates/core/.gitlab-ci-k8s-smoke-tests.yml'
-  
-
-  
-  # Spring Boot specific variables
+      - '/templates/core/.gitlab-ci-tests.yml'
+      - '/templates/core/.gitlab-ci-kubernetes.yml'
+      
+  # Variables Spring Boot
   - project: 'demo/ci-templates'
     ref: 'main'
     file:
-      - '/templates/stack-technologique/spring-boot/variables/defaults.yml'
-      
+      - '/shared/variables/spring-boot-defaults.yml'
 
- 
+# === JOBS SPÉCIFIQUES SPRING BOOT ===
+# (Seulement ce qui est vraiment spécifique)

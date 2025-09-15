@@ -1,0 +1,1252 @@
+stages:
+  - checkout
+  - build
+  - test 
+  - security
+  - sonarqube
+  - docker
+  - docker_security
+  - image_signing      # Add this new stage
+  - image_verification # Add this new stage
+  - deploy-staging
+  - staging-tests
+  - deploy-production
+  - monitoring-verify
+  - deploy-gke
+
+
+
+variables:
+  #cosign variables
+  COSIGN_VERSION: "v2.2.4"
+  COSIGN_EXPERIMENTAL: 0
+ 
+  DOCKER_IMAGE: 'hatemnefzi/monitoring-backend:latest'
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+  DOCKER_HOST: "unix:///var/run/docker.sock"
+  REGISTRY_URL: "localhost:5000"
+  # For kubernetes deployment - we are going to us the host IP instead of localhost.
+  MINIKUBE_HOST_IP: "192.168.58.1"
+  K8S_REGISTRY_URL: "$MINIKUBE_HOST_IP:5000" # (172.17.0.1:5000)
+  REGISTRY_IMAGE: "$REGISTRY_URL/proxiad-academie/monitoring-backend"
+  K8S_REGISTRY_IMAGE: "$K8S_REGISTRY_URL/proxiad-academie/monitoring-backend" # this is the image ref for k8s 
+  REGISTRY_USER: "ops"
+  REGISTRY_PASSWORD: "ops2025"
+  DOCKER_OPTS: "--config $CI_PROJECT_DIR/.docker"
+   # adding dynamic traceable tags..
+  COMMIT_TAG: "${CI_COMMIT_SHORT_SHA}"
+  #VERSIONED_IMAGE: "$REGISTRY_IMAGE:${COMMIT_TAG}"
+  KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
+  HOST_IP: "172.17.0.1"  # Your Docker host IP. (172.17.0.1)
+  #ensures sonarqube can access full git history
+  GIT_DEPTH: 50
+  # Environment-specific variables
+  STAGING_NAMESPACE: "staging"
+  PRODUCTION_NAMESPACE: "production"
+  STAGING_REPLICAS: 1
+  PRODUCTION_REPLICAS: 3
+  STAGING_RESOURCES_MEMORY_REQUEST: "256Mi"
+  STAGING_RESOURCES_MEMORY_LIMIT: "512Mi"
+  PRODUCTION_RESOURCES_MEMORY_REQUEST: "512Mi"
+  PRODUCTION_RESOURCES_MEMORY_LIMIT: "1Gi"
+  #Fixed : use consistent namign and provide a valid hostname 
+  STAGING_HOST: "myapp.staging.local"
+  PRODUCTION_HOST: "myapp.production.local"
+  #variables needed for multi-environment setup 
+  STAGING_VM_IP: "192.168.100.155" #vm1 with minikube.
+  PRODUCTION_VM_IP: "192.168.100.156" #vm2 with K3s
+  STAGING_KUBE_SERVER: "http://${STAGING_VM_IP}:8888"
+  PRODUCTION_KUBE_SERVER: "https://${PRODUCTION_VM_IP}:6443"
+  # GitLab Container Registry variables
+  GITLAB_REGISTRY_URL: "$CI_REGISTRY"
+  GITLAB_REGISTRY_IMAGE: "$CI_REGISTRY_IMAGE"
+  GITLAB_REGISTRY_USER: "$CI_REGISTRY_USER"
+  GITLAB_REGISTRY_PASSWORD: "$CI_REGISTRY_PASSWORD"
+  # New monitoring variables
+  PROMETHEUS_STAGING_URL: "http://${STAGING_VM_IP}:30090"
+  GRAFANA_STAGING_URL: "http://${STAGING_VM_IP}:30080"
+  PROMETHEUS_PRODUCTION_URL: "http://prometheus.production.local"
+  GRAFANA_PRODUCTION_URL: "http://grafana.production.local"
+  GRAFANA_ADMIN_PASSWORD: "admin123"
+  #GCP/GKE specific variables
+  GCP_PROJECT_ID: "decent-vertex-459014-k2"
+  GKE_CLUSTER_NAME: "my-pfe-cluster"
+  GKE_ZONE: "europe-west1-b"
+  GKE_NAMESPACE: "monitoring-backend"
+  GKE_REPLICAS: 2
+  GKE_MEMORY_REQUEST: "256Mi"
+  GKE_MEMORY_LIMIT: "512Mi"
+  GKE_CPU_REQUEST: "100m"
+  GKE_CPU_LIMIT: "200m"
+
+   # Application Configuration.
+  APP_NAME: "monitoring-backend"
+  APP_PORT: "9090"
+  # Monitoring Backend specific variables
+  MONITORING_BACKEND_REGISTRY_IMAGE: "hatemnefzi/monitoring-backend"
+  MONITORING_BACKEND_DOCKER_USERNAME: "hatemnefzi"
+  MONITORING_BACKEND_DOCKER_PASSWORD: "your-docker-password"
+
+  # Environment specific resources
+  STAGING_MONITORING_REPLICAS: "1"
+  STAGING_MONITORING_MEMORY_REQUEST: "192Mi"
+  STAGING_MONITORING_MEMORY_LIMIT: "384Mi"
+
+  PRODUCTION_MONITORING_REPLICAS: "2"
+  PRODUCTION_MONITORING_MEMORY_REQUEST: "384Mi"
+  PRODUCTION_MONITORING_MEMORY_LIMIT: "768Mi"
+
+  GKE_MONITORING_REPLICAS: "3"
+  GKE_MONITORING_MEMORY_REQUEST: "512Mi"
+  GKE_MONITORING_MEMORY_LIMIT: "1Gi"
+  GKE_MONITORING_CPU_REQUEST: "400m"
+  KE_MONITORING_CPU_LIMIT: "800m"
+  
+
+  
+
+
+
+
+
+.job_template: &job_definition
+  tags:
+    - docker
+  before_script:
+    - echo "starting job in ${CI_JOB_NAME} stage"
+
+.maven_job: &maven_definition
+  <<: *job_definition
+  image: hatemnefzi/maven-docker:latest
+  variables:
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - export MAVEN_HOME=/usr/share/maven
+    - export PATH=$MAVEN_HOME/bin:$PATH
+
+.kubectl_job: &kubectl_definition
+  <<: *job_definition
+  image: alpine/k8s:1.25.10
+  variables:
+    KUBECONFIG: /tmp/kubeconfig/config
+
+
+# Template for production jobs (runs on VM2 - K3s)
+.production_job: &production_job_definition
+  tags:
+    - production  # New runner tag
+    - gitlab-runner-prod
+    - kubernetes
+    - minikube
+    - registry
+  variables:
+    TARGET_ENV: "production"
+    REGISTRY_URL: "$PRODUCTION_REGISTRY_URL"
+    KUBE_SERVER: "https://$PRODUCTION_VM_IP:6443"  # K3s uses HTTPS and port 6443
+
+
+# Common job definitions
+.monitoring_backend_deploy_base: &monitoring_backend_deploy_base
+  <<: *job_definition
+  image: alpine/k8s:1.30.0
+  variables:
+    APP_NAME: "monitoring-backend"
+    CONTAINER_PORT: 9090
+    SERVICE_PORT: 80
+    KUSTOMIZE_VERSION: "v5.4.3"
+  before_script:
+    - apk add --no-cache curl jq gettext
+    - echo "Installing Kustomize..."
+    - curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+    - mv kustomize /usr/local/bin/
+    - kustomize version
+
+.monitoring_staging_deploy: &monitoring_staging_deploy
+  <<: *monitoring_backend_deploy_base
+  variables:
+    ENVIRONMENT: staging
+    KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
+    MINIKUBE_IP: "192.168.49.2"
+    MINIKUBE_PORT: "8443"
+    KUBECTL_VERSION: "v1.32.3"
+  before_script:
+    - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+    - chmod +x kubectl && mv kubectl /usr/local/bin/
+    - mkdir -p "$(dirname "$KUBECONFIG")"
+    - |
+      echo "Creating kubeconfig with service account token..."
+      cat > "$KUBECONFIG" <<EOF
+      apiVersion: v1
+      clusters:
+      - cluster:
+          server: https://${MINIKUBE_IP}:${MINIKUBE_PORT}
+          insecure-skip-tls-verify: true
+        name: minikube
+      contexts:
+      - context:
+          cluster: minikube
+          user: gitlab-ci
+        name: minikube
+      current-context: minikube
+      kind: Config
+      preferences: {}
+      users:
+      - name: gitlab-ci
+        user:
+          token: ${MINIKUBE_TOKEN}
+      EOF
+    
+    # Test the connection.
+    - echo "Testing Kubernetes connection..."
+    - kubectl cluster-info
+    - kubectl get nodes
+    - echo "✅ Kubernetes connection successful!"
+
+.monitoring_production_deploy: &monitoring_production_deploy
+  <<: *monitoring_backend_deploy_base
+  variables:
+    ENVIRONMENT: production
+    KUBECONFIG: "${CI_PROJECT_DIR}/.kube/config"
+  before_script:
+    - mkdir -p "$(dirname "$KUBECONFIG")"
+    - |
+      cat > "${KUBECONFIG}" <<EOF
+      apiVersion: v1
+      clusters:
+      - cluster:
+          server: ${K3S_SERVER}
+          certificate-authority-data: ${K3S_CA_CERT}
+        name: k3s-cluster
+      contexts:
+      - context:
+          cluster: k3s-cluster
+          user: k3s-user
+        name: k3s-context
+      current-context: k3s-context
+      kind: Config
+      preferences: {}
+      users:
+      - name: k3s-user
+        user:
+          client-certificate-data: ${K3S_CLIENT_CERT}
+          client-key-data: ${K3S_CLIENT_KEY}
+      EOF
+    - kubectl config current-context
+    - kubectl cluster-info
+
+.monitoring_gke_deploy: &monitoring_gke_deploy
+  <<: *monitoring_backend_deploy_base
+  image: google/cloud-sdk:slim
+  variables:
+    ENVIRONMENT: gke
+    KUBECONFIG: "${CI_PROJECT_DIR}/.kube/gke-config"
+    USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
+    CLOUDSDK_CORE_PROJECT: "$GCP_PROJECT_ID"
+  before_script:
+    - apt-get update && apt-get install -y curl kubectl tar google-cloud-cli-gke-gcloud-auth-plugin
+
+    - echo "Installing Kustomize safely..."
+    - export KUSTOMIZE_VERSION=v5.4.3
+    - curl -Lo kustomize.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz
+    - tar -zxvf kustomize.tar.gz
+    - chmod +x kustomize && mv kustomize /usr/local/bin/
+    - kustomize version
+
+    - echo "Setting up GCP authentication..."
+    - echo "$GCP_SERVICE_ACCOUNT_KEY" | base64 -d > /tmp/gcp-key.json
+    - gcloud auth activate-service-account --key-file /tmp/gcp-key.json
+    - gcloud config set project $GCP_PROJECT_ID
+    - export CLOUDSDK_CORE_PROJECT=$GCP_PROJECT_ID
+    - gcloud services enable container.googleapis.com cloudresourcemanager.googleapis.com
+    - gcloud container clusters get-credentials $GKE_CLUSTER_NAME --zone $GKE_ZONE
+  after_script:
+    - rm -f /tmp/gcp-key.json
+
+
+# Template for Cosign jobs
+.cosign_job: &cosign_definition
+  <<: *maven_definition
+  
+  before_script:
+    - apt-get update && apt-get install -y curl wget
+    - echo "Installing Cosign ${COSIGN_VERSION}..."
+    - wget "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+    - mv cosign-linux-amd64 /usr/local/bin/cosign
+    - chmod +x /usr/local/bin/cosign
+    - cosign version
+
+
+
+checkout:
+  <<: *job_definition
+  stage: checkout
+  before_script:
+    - echo "Cleaning previous build artifacts..."
+    - rm -rf target/
+  script:
+    - echo "Checking out code from ${CI_REPOSITORY_URL}"
+  artifacts:
+    paths:
+      - ./
+
+build:
+  <<: *maven_definition
+  stage: build
+  cache:
+    key: maven
+    paths:
+      - .m2/repository
+  script:
+    - mvn clean package -DskipTests
+  artifacts:
+    paths:
+      - target/
+
+sonarqube_scan:
+  <<: *maven_definition
+  stage: security
+  needs: ["build"]
+  variables:
+    SONAR_SCANNER_OPTS: "-Xmx1024m"
+  script:
+    - >
+      mvn sonar:sonar
+      -Dsonar.projectKey=monitoring-backend
+      -Dsonar.projectName=monitoring-backend
+      -Dsonar.host.url=${SONAR_HOST_URL}
+      -Dsonar.token=${SONAR_TOKEN}
+      -Dsonar.java.binaries=target/classes
+      -Dsonar.sourceEncoding=UTF-8
+      -Dsonar.sources=src/main/java
+      -Dsonar.tests=src/test/java
+      -Dsonar.junit.reportPaths=target/surefire-reports
+
+owasp_dependency_check:
+  <<: *maven_definition
+  stage: security
+  needs: ["build"]
+  variables:
+    FAIL_ON_CVSS: 9
+  before_script:
+    - mkdir -p .cache/dependency-check
+    - if [ -f package.json ]; then npm install --package-lock-only; fi
+  script:
+    - |
+      mvn org.owasp:dependency-check-maven:12.1.0:check \
+        -Dformat=ALL \
+        -DoutputDirectory=./target \
+        -DsuppressionFile=.gitlab/dependency-check-suppressions.xml \
+        -DdataDirectory=.cache/dependency-check \
+        -Dnvd.api.key=${NVD_API_KEY} \
+        -DfailBuildOnCVSS=${FAIL_ON_CVSS}
+    - ls -la target/ | grep dependency-check
+  artifacts:
+    paths:
+      - target/dependency-check-report.*
+    reports:
+      dependency_scanning: target/dependency-check-report.json
+    expire_in: 1 week
+  cache:
+    key: "dependency-check-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .cache/dependency-check/
+    policy: pull-push
+  rules:
+    - if: $CI_COMMIT_BRANCH == "experiment"
+
+
+
+
+
+
+
+
+
+docker_publish:
+  <<: *job_definition
+  stage: docker
+  image: docker:24.0
+  variables:
+    DOCKER_HOST: "unix:///var/run/docker.sock"
+    DOCKER_BUILDKIT: 1
+  before_script:
+    - apk add --no-cache curl
+    - echo "Using GitLab Container Registry $CI_REGISTRY_IMAGE"
+    - echo "Commit SHA ${CI_COMMIT_SHORT_SHA}"
+
+  script:
+    - echo "=== BUILDING DOCKER IMAGE ==="
+    - docker build -t "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}" -t "$CI_REGISTRY_IMAGE:latest" .
+
+    - echo "=== LOGGING INTO GITLAB CONTAINER REGISTRY ==="
+    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+
+    - echo "=== PUSHING IMAGES ==="
+    - echo "Pushing versioned tag $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    - docker push "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    - echo "Pushing latest tag $CI_REGISTRY_IMAGE:latest"
+    - docker push "$CI_REGISTRY_IMAGE:latest"
+    # ✅ Capture the digest of the pushed image
+    - IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}")
+    - echo "IMAGE_DIGEST=$IMAGE_DIGEST" >> build.env
+    
+    - echo "=== IMAGES PUSHED SUCCESSFULLY ==="
+    - echo "Versioned $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    - echo "Latest $CI_REGISTRY_IMAGE:latest"
+    - echo "digest $IMAGE_DIGEST"
+  artifacts:
+    reports:
+      dotenv: build.env
+    paths:
+      - build.env
+  rules:
+    - if: $CI_COMMIT_BRANCH == "experiment"
+
+
+
+
+container_scan:
+  <<: *job_definition
+  stage: docker_security
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  needs: ["docker_publish"]
+  script:
+    - echo "Scanning image $VERSIONED_IMAGE"
+    - trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --insecure --output gl-container-scanning-report.json "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+  artifacts:
+    reports:
+      container_scanning: gl-container-scanning-report.json
+    when: always
+  rules:
+    - if: $CI_COMMIT_BRANCH == "experiment"
+
+k8s_manifest_scan:
+  <<: *production_job_definition
+  stage: docker_security
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  script:
+    - echo "🔍 Scanning Kubernetes manifests for security misconfigurations..."
+
+    # Scan base. (no trailing backslashes!)
+    - |
+      trivy config k8s/base \
+        --exit-code 0 \
+        --severity MEDIUM,HIGH,CRITICAL || echo "Scan finished with issues in base"
+
+    # Scan each overlay separately
+    - |
+      for overlay in k8s/overlays/*; do
+        echo "🔎 Scanning $overlay ..."
+        trivy config "$overlay" \
+          --exit-code 0 \
+          --severity MEDIUM,HIGH,CRITICAL || echo "Scan finished with issues in $overlay"
+      done
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "experiment"'
+
+# New image signing job (runs after docker_publish)
+sign_images:
+  <<: *cosign_definition
+  stage: image_signing
+  needs: ["docker_publish","container_scan"]
+  script:
+    - echo "=== COSIGN LOGIN TO GITLAB REGISTRY ==="
+    - cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+
+    - echo "=== SIGNING IMAGE WITH COSIGN ==="
+    - echo "Digest to sign  $IMAGE_DIGEST"
+    - cosign sign --yes "$IMAGE_DIGEST"
+
+    - echo "✅ Image signed successfully!"
+    - echo "   Digest $IMAGE_DIGEST"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "experiment"
+
+# Image verification job (runs after signing)
+# Image verification job (runs after signing)
+verify_signatures:
+  <<: *cosign_definition
+  stage: image_verification
+  needs:
+    - job: docker_publish
+      artifacts: true
+    - job: sign_images
+  variables:
+    COSIGN_EXPERIMENTAL: "1"   # rester en mode non-keyless
+  script:
+    - echo "=== COSIGN LOGIN TO GITLAB REGISTRY ==="
+    - cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+
+    # For keyless verification, you need to specify the certificate identity
+    # This should match the identity used during signing (your email/identity from the OAuth flow)
+    # Use the correct issuer (Google) and your specific email
+    - |
+      cosign verify "$IMAGE_DIGEST" \
+        --certificate-identity="hatemnbouali111000@gmail.com" \
+        --certificate-oidc-issuer="https://accounts.google.com"
+
+    - echo " Signature verification succeeded for digest $IMAGE_DIGEST"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "experiment"
+
+
+
+
+
+deploy_monitoring_backend_staging:
+  <<: *monitoring_staging_deploy
+  stage: deploy-staging
+  needs: 
+    - job: docker_publish
+      artifacts: true
+    - job: verify_signatures
+  before_script:
+    # ADD THESE LINES TO VERIFY SIGNATURE BEFORE DEPLOYMENT
+    - apk add --no-cache curl wget
+    - wget "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+    - mv cosign-linux-amd64 /usr/local/bin/cosign
+    - chmod +x /usr/local/bin/cosign
+    # LOGIN TO REGISTRY (THIS WAS MISSING!)
+    - echo "🔐 Logging into GitLab Container Registry..."
+    - cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+    # Verify image signature before deployment
+    - echo "🔒 Verifying image signature before staging deployment..."
+    - cosign verify --certificate-identity-regexp ".*@.*" --certificate-oidc-issuer-regexp ".*" "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+    - echo "✅ Image signature verified! Proceeding with deployment..."
+    
+    # THEN CONTINUE WITH YOUR EXISTING before_script CONTENT
+    - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+    - chmod +x kubectl && mv kubectl /usr/local/bin/
+    # ... rest of your existing before_script ...
+  
+  script:
+    - echo "=== DEPLOYING MONITORING BACKEND TO STAGING ==="
+    - echo "Using commit SHA ${CI_COMMIT_SHORT_SHA}"
+    - echo "Registry image ${CI_REGISTRY_IMAGE}"
+    - kubectl cluster-info
+    
+    # Create namespace
+    - kubectl create namespace ${ENVIRONMENT} --dry-run=client -o yaml | kubectl apply -f -
+    
+    # Create GitLab registry secret for staging namespace
+    - |
+      echo "Creating GitLab Container Registry secret for ${ENVIRONMENT}..."
+      kubectl delete secret gitlab-registry-secret -n ${ENVIRONMENT} --ignore-not-found=true
+      kubectl create secret docker-registry gitlab-registry-secret \
+        --docker-server=${CI_REGISTRY} \
+        --docker-username=${CI_REGISTRY_USER} \
+        --docker-password=${GITLAB_PERSONAL_TOKEN} \
+        -n ${ENVIRONMENT} \
+        --dry-run=client -o yaml | kubectl apply -f -
+    
+    # Store the project root
+    - PROJECT_ROOT=$(pwd)
+    - echo "Project root $PROJECT_ROOT"
+    
+    # Apply RBAC resources first
+    - |
+      echo "=== APPLYING RBAC RESOURCES ==="
+      kubectl apply -f $PROJECT_ROOT/k8s/base/rbac/service-account.yaml -n ${ENVIRONMENT}
+      kubectl apply -f $PROJECT_ROOT/k8s/base/rbac/cluster-role.yaml -n ${ENVIRONMENT}
+      kubectl apply -f $PROJECT_ROOT/k8s/base/rbac/cluster-role-binding.yaml -n ${ENVIRONMENT}
+    
+    # Navigate to staging overlay directory
+    - cd $PROJECT_ROOT/k8s/overlays/staging
+    - echo "Current directory $(pwd)"
+    - ls -la
+    
+    # Clean up existing resources to avoid immutable field conflicts
+    - kubectl delete configmap monitoring-backend-config -n ${ENVIRONMENT} --ignore-not-found=true
+    - kubectl delete deployment monitoring-backend -n ${ENVIRONMENT} --ignore-not-found=true
+    
+    # Fix deprecated kustomize syntax automatically
+    - |
+      echo "=== FIXING KUSTOMIZE SYNTAX ==="
+      kustomize edit fix || echo "No syntax issues to fix"
+    
+    # Update kustomization with the current commit SHA tag
+    - |
+      echo "=== UPDATING IMAGE TAG ==="
+      echo "Setting image to: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
+      
+      # Use kustomize to set the image with the dynamic commit SHA
+      kustomize edit set image monitoring-backend=${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
+      
+      echo "Updated kustomization.yaml:"
+      cat kustomization.yaml
+    
+    # Validate the kustomization before applying
+    - |
+      echo "=== VALIDATING KUSTOMIZATION ==="
+      kustomize build . > $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
+      
+      # Check for common issues in the generated manifests
+      echo "=== CHECKING FOR MANIFEST ISSUES ==="
+      
+      # Check for valueFrom conflicts
+      if grep -n "valueFrom:" $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml; then
+        echo "Found valueFrom entries - checking for conflicts..."
+        # Show env section for debugging
+        sed -n '/env:/,/resources:/p' $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
+      fi
+      
+      # Show the image being used in the deployment
+      echo "=== IMAGE IN DEPLOYMENT ==="
+      grep -A 5 -B 5 "image:" $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml || echo "No image found in manifests"
+    
+    # Apply the manifests using the generated file to ensure consistency
+    - |
+      echo "=== APPLYING MANIFESTS ==="
+      kubectl apply -f $PROJECT_ROOT/monitoring-backend-staging-manifests.yaml
+    
+    # Wait a moment for the deployment to be created/updated
+    - sleep 5
+    
+    # Check if deployment was created successfully
+    - |
+      echo "=== CHECKING DEPLOYMENT CREATION ==="
+      # Wait for deployment to be created
+      sleep 10
+      
+      if kubectl get deployment monitoring-backend -n ${ENVIRONMENT} >/dev/null 2>&1; then
+        echo "Deployment created successfully, waiting for rollout..."
+        kubectl rollout status deployment/monitoring-backend -n ${ENVIRONMENT} --timeout=600s
+      else
+        echo "❌ ERROR: Deployment was not created"
+        exit 1
+      fi
+    
+    # Apply ingress if it exists.
+    - |
+      echo "=== APPLYING INGRESS ==="
+      if [ -f "$PROJECT_ROOT/k8s/ingress/staging-ingress.yaml" ]; then
+        kubectl apply -f $PROJECT_ROOT/k8s/ingress/staging-ingress.yaml
+      else
+        echo "No staging ingress file found, skipping..."
+      fi
+    
+    # Show final deployment status and verify the image
+    - |
+      echo "=== DEPLOYMENT STATUS ==="
+      kubectl get deployments,services,configmaps -n ${ENVIRONMENT}
+      kubectl get pods -l app=monitoring-backend -n ${ENVIRONMENT} -o wide
+      
+      # Show the actual image being used in the deployment spec
+      echo "=== CURRENT IMAGE IN DEPLOYMENT SPEC ==="
+      DEPLOYMENT_IMAGE=$(kubectl get deployment monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.spec.template.spec.containers[0].image}')
+      echo "Deployment spec image: $DEPLOYMENT_IMAGE"
+      
+      # Show the actual image being used in running pods
+      echo "=== CURRENT IMAGE IN RUNNING PODS ==="
+      kubectl get pods -l app=monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.items[*].spec.containers[0].image}' | tr ' ' '\n' | sort -u
+      
+      # Verify the image matches what we expect
+      EXPECTED_IMAGE="${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
+      if [ "$DEPLOYMENT_IMAGE" = "$EXPECTED_IMAGE" ]; then
+        echo "✅ SUCCESS: Deployment image matches expected image"
+      else
+        echo "❌ ERROR: Deployment image ($DEPLOYMENT_IMAGE) does not match expected image ($EXPECTED_IMAGE)"
+        exit 1
+      fi
+      
+      # Show environment variables for debugging
+      echo "=== ENVIRONMENT VARIABLES ==="
+      kubectl get deployment monitoring-backend -n ${ENVIRONMENT} -o jsonpath='{.spec.template.spec.containers[0].env}' | jq .
+      
+      # Show recent events
+      echo "=== RECENT EVENTS ==="
+      kubectl get events -n ${ENVIRONMENT} --sort-by='.lastTimestamp' | tail -10
+      
+      # Final health check
+      echo "=== HEALTH CHECK ==="
+      kubectl get pods -l app=monitoring-backend -n ${ENVIRONMENT} --no-headers | while read pod rest; do
+        echo "Pod: $pod"
+        kubectl get pod $pod -n ${ENVIRONMENT} -o jsonpath='{.status.phase}'
+        echo ""
+      done
+  
+  artifacts:
+    paths:
+      - monitoring-backend-staging-manifests.yaml
+    expire_in: 1 week
+    when: always
+  rules:
+    - if: $CI_COMMIT_BRANCH == "experiment"
+
+
+
+    
+monitoring_staging_smoke_tests:
+  <<: *kubectl_definition
+  stage: staging-tests
+  image: alpine:3.18
+  variables:
+    ENVIRONMENT: staging
+    KUBECTL_VERSION: "v1.32.3"
+    KUBECONFIG: "${CI_PROJECT_DIR}/.kube/config"
+    MINIKUBE_IP: "192.168.49.2"  # Changed from HOST_IP to MINIKUBE_IP
+    MINIKUBE_PORT: "8443"        # Changed from 8888 to 8443
+  before_script:
+    - apk add --no-cache curl jq bash wget
+    - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+    - chmod +x kubectl && mv kubectl /usr/local/bin/
+    - mkdir -p "$(dirname "$KUBECONFIG")"
+    - |
+      echo "Creating kubeconfig with service account token..."
+      cat > "${KUBECONFIG}" <<EOF
+      apiVersion: v1
+      clusters:
+      - cluster:
+          server: https://${MINIKUBE_IP}:${MINIKUBE_PORT}  # Changed to HTTPS
+          insecure-skip-tls-verify: true
+        name: minikube
+      contexts:
+      - context:
+          cluster: minikube
+          user: gitlab-ci
+        name: minikube
+      current-context: minikube
+      kind: Config
+      preferences: {}
+      users:
+      - name: gitlab-ci
+        user:
+          token: ${MINIKUBE_TOKEN}  # Added token authentication
+      EOF
+    
+    # Test the connection
+    - echo "Testing Kubernetes connection..."
+    - kubectl cluster-info
+    - kubectl get nodes
+    - echo "✅ Kubernetes connection successful!"
+    
+  script:
+    - echo "Running smoke tests against ${ENVIRONMENT} environment..."
+
+    # Wait for pod readiness
+    - echo "Waiting for monitoring-backend pod to be ready..."
+    - kubectl wait --for=condition=Ready pod -l app=monitoring-backend -n ${ENVIRONMENT} --timeout=180s
+
+    # Get pod name
+    - POD_NAME=$(kubectl get pods -n ${ENVIRONMENT} -l app=monitoring-backend -o jsonpath='{.items[0].metadata.name}')
+    - echo "Using pod $POD_NAME"
+
+    # Wait for Spring Boot logs to confirm app start
+    - echo "Waiting for Spring Boot to fully start..."
+    - |
+      for i in $(seq 1 60); do
+        if kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=5 | grep -q "Started.*Application.*in.*seconds"; then
+          echo "✅ Spring Boot application has started"
+          break
+        else
+          echo "Waiting... ($i/60)"
+          sleep 5
+        fi
+        if [ $i -eq 60 ]; then
+          echo "❌ App didn't start in 5 minutes"
+          kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=20
+          exit 1
+        fi
+      done
+
+    # Port-forward 9090 -> localhost
+    - echo "Starting port-forward..."
+    - kubectl port-forward service/monitoring-backend-service 9090:80 -n ${ENVIRONMENT} &
+    - PORT_FORWARD_PID=$!
+    - sleep 10
+
+    # Smoke test endpoints
+    - |
+      echo "=== SMOKE TESTS ==="
+      endpoints="/actuator/health /api/kubernetes/pods"
+
+      ALL_PASSED=true
+
+      for endpoint in $endpoints; do
+        echo "Testing: $endpoint"
+        if wget --spider -q --timeout=10 http://localhost:9090$endpoint; then
+          echo "✅ $endpoint OK"
+        else
+          echo "❌ $endpoint FAILED"
+          ALL_PASSED=false
+        fi
+      done
+
+      if [ "$ALL_PASSED" = "true" ]; then
+        echo "✅ All smoke tests passed"
+      else
+        echo "❌ Some tests failed"
+        echo "Showing logs:"
+        kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=20 || true
+        echo "Trying endpoints with output:"
+        for endpoint in $endpoints; do
+          echo "--- $endpoint ---"
+          wget -qO- --timeout=10 http://localhost:9090$endpoint || true
+        done
+        kill $PORT_FORWARD_PID || true
+        exit 1
+      fi
+
+    # Clean up
+    - kill $PORT_FORWARD_PID || true
+
+  needs: ["deploy_monitoring_backend_staging"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "experiment"'
+
+
+monitoring_staging_comprehensive_tests:
+  <<: *kubectl_definition
+  stage: staging-tests
+  image: debian:bullseye
+  variables:
+    ENVIRONMENT: staging
+    KUBECTL_VERSION: "v1.32.3"
+    KUBECONFIG: "${CI_PROJECT_DIR}/.kube/config"
+    MINIKUBE_IP: "192.168.49.2"
+    MINIKUBE_PORT: "8443"
+  before_script:
+    - apt-get update && apt-get install -y curl jq wget apache2-utils
+    - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+    - chmod +x kubectl && mv kubectl /usr/local/bin/
+    - mkdir -p "$(dirname "$KUBECONFIG")"
+    - |
+      echo "Creating kubeconfig with service account token..."
+      cat > "${KUBECONFIG}" <<EOF
+      apiVersion: v1
+      clusters:
+      - cluster:
+          server: https://${MINIKUBE_IP}:${MINIKUBE_PORT}
+          insecure-skip-tls-verify: true
+        name: minikube
+      contexts:
+      - context:
+          cluster: minikube
+          user: gitlab-ci
+        name: minikube
+      current-context: minikube
+      kind: Config
+      preferences: {}
+      users:
+      - name: gitlab-ci
+        user:
+          token: ${MINIKUBE_TOKEN}
+      EOF
+
+    - echo "Testing Kubernetes connection..."
+    - kubectl cluster-info
+    - kubectl get nodes
+    - echo "✅ Kubernetes connection successful!"
+
+  script:
+    - echo "=== COMPREHENSIVE STAGING TESTS ==="
+
+    - echo "Waiting for monitoring-backend pod to be ready..."
+    - kubectl wait --for=condition=Ready pod -l app=monitoring-backend -n ${ENVIRONMENT} --timeout=300s
+
+    - POD_NAME=$(kubectl get pods -n ${ENVIRONMENT} -l app=monitoring-backend -o jsonpath='{.items[0].metadata.name}')
+    - echo "Using pod $POD_NAME"
+
+    - |
+      echo "Waiting for Spring Boot to fully start..."
+      for i in $(seq 1 60); do
+        if kubectl logs $POD_NAME -n ${ENVIRONMENT} | grep -q "Started .* in .* seconds"; then
+          echo "✅ Spring Boot application has started"
+          break
+        else
+          echo "Waiting... ($i/60)"
+          sleep 5
+        fi
+        if [ $i -eq 60 ]; then
+          echo "❌ App didn't start in 5 minutes"
+          kubectl logs $POD_NAME -n ${ENVIRONMENT} --tail=50
+          exit 1
+        fi
+      done
+
+    - echo "Starting port-forward..."
+    - kubectl port-forward service/monitoring-backend-service 9091:80 -n ${ENVIRONMENT} &
+    - PORT_FORWARD_PID=$!
+    - sleep 15
+
+    # --- Health Checks
+    - |
+      bash -c '
+      echo "=== HEALTH CHECK TESTS ==="
+      endpoints=(
+        "/actuator/health"
+        "/actuator/info"
+        "/actuator/metrics"
+        "/actuator/prometheus"
+        "/api/kubernetes/pods"
+        "/api/kubernetes/services"
+      )
+      ALL_PASSED=true
+      for endpoint in "${endpoints[@]}"; do
+        echo "Testing: $endpoint"
+        if response=$(curl -s -w "%{http_code}" -o /tmp/response.txt "http://localhost:9091$endpoint"); then
+          http_code=$(echo "$response" | tail -n1)
+          if [ "$http_code" -eq 200 ]; then
+            echo "✅ $endpoint: HTTP $http_code"
+          else
+            echo "❌ $endpoint: HTTP $http_code"
+            ALL_PASSED=false
+          fi
+        else
+          echo "❌ $endpoint: Connection failed"
+          ALL_PASSED=false
+        fi
+      done
+      echo "HEALTH_CHECK_RESULT=$ALL_PASSED" > /tmp/health_check_result
+      '
+    - HEALTH_CHECK_RESULT=$(cut -d'=' -f2 < /tmp/health_check_result)
+
+    # --- Performance Test
+    - echo "=== PERFORMANCE TEST ==="
+    - ab -n 1000 -c 5 http://localhost:9091/actuator/health > ab_results.txt
+    - |
+      if grep -q "Requests per second" ab_results.txt; then
+        echo "✅ Performance test passed"
+        grep "Requests per second" ab_results.txt
+        echo "PERF_TEST_RESULT=true" > /tmp/perf_test_result
+      else
+        echo "❌ Performance test failed"
+        cat ab_results.txt
+        echo "PERF_TEST_RESULT=false" > /tmp/perf_test_result
+      fi
+    - PERF_TEST_RESULT=$(cut -d'=' -f2 < /tmp/perf_test_result)
+
+    # --- API Response Validation
+    - |
+      bash -c '
+      echo "=== API RESPONSE VALIDATION ==="
+      if health_response=$(curl -s "http://localhost:9091/actuator/health"); then
+        echo "Health response: $health_response"
+        if echo "$health_response" | jq -e ".status" > /dev/null 2>&1; then
+          echo "✅ Valid JSON with .status"
+          echo "API_VALIDATION_RESULT=true" > /tmp/api_validation_result
+        else
+          echo "❌ Invalid structure"
+          echo "API_VALIDATION_RESULT=false" > /tmp/api_validation_result
+        fi
+      else
+        echo "❌ Failed to get response"
+        echo "API_VALIDATION_RESULT=false" > /tmp/api_validation_result
+      fi
+      '
+    - API_VALIDATION_RESULT=$(cut -d'=' -f2 < /tmp/api_validation_result)
+
+    # --- Kubernetes API Endpoint Test
+    - |
+      bash -c '
+      echo "=== K8S API TEST ==="
+      if pods_response=$(curl -s "http://localhost:9091/api/kubernetes/pods"); then
+        if echo "$pods_response" | jq -e "type" > /dev/null 2>&1; then
+          echo "✅ Valid JSON from pods API"
+          echo "K8S_API_RESULT=true" > /tmp/k8s_api_result
+        else
+          echo "❌ Malformed JSON"
+          echo "K8S_API_RESULT=false" > /tmp/k8s_api_result
+        fi
+      else
+        echo "❌ Failed request"
+        echo "K8S_API_RESULT=false" > /tmp/k8s_api_result
+      fi
+      '
+    - K8S_API_RESULT=$(cut -d'=' -f2 < /tmp/k8s_api_result)
+
+    # --- Memory Usage Test
+    - |
+      bash -c '
+      echo "=== JVM MEMORY CHECK ==="
+      if metrics_response=$(curl -s "http://localhost:9091/actuator/metrics/jvm.memory.used"); then
+        used_memory=$(echo "$metrics_response" | jq -r ".measurements[0].value")
+        if [ "$used_memory" != "null" ]; then
+          echo "✅ Memory: $used_memory"
+          echo "MEMORY_CHECK_RESULT=true" > /tmp/memory_check_result
+        else
+          echo "❌ Failed to parse"
+          echo "MEMORY_CHECK_RESULT=false" > /tmp/memory_check_result
+        fi
+      else
+        echo "❌ No response"
+        echo "MEMORY_CHECK_RESULT=false" > /tmp/memory_check_result
+      fi
+      '
+    - MEMORY_CHECK_RESULT=$(cut -d'=' -f2 < /tmp/memory_check_result)
+
+    # --- Final Verdict
+    - |
+      echo "=== FINAL RESULT ==="
+      echo "Health: $HEALTH_CHECK_RESULT"
+      echo "Performance: $PERF_TEST_RESULT"
+      echo "API: $API_VALIDATION_RESULT"
+      echo "K8s: $K8S_API_RESULT"
+      echo "Memory: $MEMORY_CHECK_RESULT"
+      if [ "$HEALTH_CHECK_RESULT" = "true" ] && [ "$PERF_TEST_RESULT" = "true" ] && [ "$API_VALIDATION_RESULT" = "true" ] && [ "$K8S_API_RESULT" = "true" ] && [ "$MEMORY_CHECK_RESULT" = "true" ]; then
+        echo "✅ ALL TESTS PASSED"
+        exit 0
+      else
+        echo "❌ SOME TESTS FAILED"
+        exit 1
+      fi
+
+  after_script:
+    - echo "Cleaning up port-forward..."
+    - if [ ! -z "$PORT_FORWARD_PID" ]; then kill $PORT_FORWARD_PID 2>/dev/null || echo "Already killed"; fi
+
+  artifacts:
+    paths:
+      - ab_results.txt
+    expire_in: 1 week
+    when: always
+
+
+deploy_staging:
+  <<: *staging_job_definition
+  stage: deploy-production
+  image: alpine/k8s:1.30.0
+  variables:
+    ENVIRONMENT: staging
+    KUBECONFIG: "${CI_PROJECT_DIR}/.kube/config"
+  before_script:
+    - apk add --no-cache curl jq gettext bash
+    - mkdir -p "$(dirname "$KUBECONFIG")"
+    - |
+      cat > "${KUBECONFIG}" <<EOF
+      apiVersion: v1
+      clusters:
+      - cluster:
+          server: ${K3S_SERVER}
+          certificate-authority-data: ${K3S_CA_CERT}
+        name: k3s-cluster
+      contexts:
+      - context:
+          cluster: k3s-cluster
+          user: k3s-user
+        name: k3s-context
+      current-context: k3s-context
+      kind: Config
+      preferences: {}
+      users:
+      - name: k3s-user
+        user:
+          client-certificate-data: ${K3S_CLIENT_CERT}
+          client-key-data: ${K3S_CLIENT_KEY}
+      EOF
+    - echo "Testing connection to K3s cluster..."
+    - kubectl get nodes
+    - kubectl create namespace ${ENVIRONMENT} --dry-run=client -o yaml | kubectl apply -f -
+    # Create GitLab container registry secret
+    - |
+      kubectl delete secret gitlab-registry-secret -n ${ENVIRONMENT} --ignore-not-found=true
+      kubectl create secret docker-registry gitlab-registry-secret \
+        --docker-server=$GITLAB_REGISTRY_URL \
+        --docker-username=$GITLAB_REGISTRY_USER \
+        --docker-password=$GITLAB_REGISTRY_PASSWORD \
+        -n ${ENVIRONMENT} \
+        --dry-run=client -o yaml | kubectl apply -f -
+    # Install Kustomize.
+    - curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+    - mv kustomize /usr/local/bin/
+    - kustomize version
+  script:
+    - echo "Building production manifests with Kustomize..."
+    - cd k8s/overlays/production
+    - kustomize edit fix  # ensure compatibility.
+    - |
+      echo "=== UPDATING IMAGE TAG FOR PRODUCTION ==="
+      echo "Setting image to: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
+      kustomize edit set image monitoring-backend=${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
+
+    - kustomize build . > ${CI_PROJECT_DIR}/k8s-production.yaml
+    - echo "Applying manifests to production..."
+    - kubectl apply -f ${CI_PROJECT_DIR}/k8s-production.yaml
+    - echo "Waiting for rollout to finish..."
+    - DEPLOYMENT_NAME=$(kubectl get deployment -n ${ENVIRONMENT} -l app=monitoring-backend -o jsonpath='{.items[0].metadata.name}')
+    - kubectl rollout status deployment/$DEPLOYMENT_NAME -n ${ENVIRONMENT} --timeout=600s
+    - echo "=== FINAL STATUS ==="
+    - kubectl get all -n ${ENVIRONMENT}
+    - kubectl get ingress -n ${ENVIRONMENT}
+    - echo "Deployment complete."
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "experiment" || $CI_COMMIT_BRANCH == "main"'
+  needs:
+    - job: monitoring_staging_smoke_tests
+      optional: false
+  artifacts:
+    paths:
+      - k8s-production.yaml
+    expire_in: 1 week
+    when: always
+
+setup_monitoring:
+  <<: *production_job_definition
+  stage: monitoring-verify
+  image: alpine/k8s:1.30.0
+  variables:
+    ENVIRONMENT: production
+    KUBECONFIG: "${CI_PROJECT_DIR}/.kube/config"
+    PROMETHEUS_URL: "http://prometheus.production.local"
+    
+  before_script:
+    - apk add --no-cache curl jq bash
+    - mkdir -p "$(dirname "$KUBECONFIG")"
+    - echo "${PRODUCTION_VM_IP} prometheus.production.local" >> /etc/hosts
+    - echo "${PRODUCTION_VM_IP} grafana.production.local" >> /etc/hosts
+    # Setup kubeconfig (same as your deploy job)
+    - |
+      cat > "${KUBECONFIG}" <<EOF
+      apiVersion: v1
+      clusters:
+      - cluster:
+          server: ${K3S_SERVER}
+          certificate-authority-data: ${K3S_CA_CERT}
+        name: k3s-cluster
+      contexts:
+      - context:
+          cluster: k3s-cluster
+          user: k3s-user
+        name: k3s-context
+      current-context: k3s-context
+      kind: Config
+      users:
+      - name: k3s-user
+        user:
+          client-certificate-data: ${K3S_CLIENT_CERT}
+          client-key-data: ${K3S_CLIENT_KEY}
+      EOF
+  
+  script:
+    - echo "=== SETTING UP MONITORING ==="
+    
+    # Quick connectivity check
+    - |
+      if curl -f -s --connect-timeout 10 "${PROMETHEUS_URL}/api/v1/query?query=up" > /dev/null; then
+        echo "✅ Prometheus accessible"
+      else
+        echo "❌ Prometheus not accessible - monitoring setup will continue but may not work"
+      fi
+    
+    # Create monitoring namespace
+    - kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+    
+    # Apply monitoring resources using Kustomize (they're already included in your main kustomization!)
+    - echo "Monitoring resources are deployed with main application via Kustomize"
+    - echo "Verifying monitoring setup..."
+    
+    # Verify monitoring resources.
+    - kubectl get servicemonitor -n ${ENVIRONMENT} || echo "No ServiceMonitors found"
+    - kubectl get configmap -n monitoring -l grafana_dashboard=1 || echo "No Grafana dashboards found"
+    
+    # Wait for Prometheus to discover targets
+    - echo "Waiting 30 seconds for Prometheus discovery..."
+    - sleep 30
+    
+    # Test Prometheus targets
+    - |
+      if TARGETS=$(curl -s "${PROMETHEUS_URL}/api/v1/targets" 2>/dev/null); then
+        echo "✅ Prometheus targets query successful"
+        echo "$TARGETS" | jq -r '.data.activeTargets[]? | select(.labels.job | contains("monitoring-backend")) | "Found:  " + .labels.job + " (" + .health + ")"' || echo "Target not yet discovered"
+      else
+        echo "⚠️ Could not query Prometheus targets"
+      fi
+    
+    - echo "=== MONITORING SETUP COMPLETE ==="
+    - echo "ServiceMonitor will be discovered by Prometheus automatically"
+    - echo "Grafana dashboard available in monitoring namespace"
+  
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "experiment" || $CI_COMMIT_BRANCH == "main"'
+  needs:
+    - job: deploy_production
+      optional: false
+
+
+deploy_monitoring_backend_gke:
+  <<: *monitoring_gke_deploy
+  stage: deploy-gke
+  script:
+    - echo "=== Context ==="
+    - echo "Project $GCP_PROJECT_ID"
+    - echo "Cluster $GKE_CLUSTER_NAME"
+    - echo "Zone $GKE_ZONE"
+    - echo "Namespace $GKE_NAMESPACE"
+
+    # Create namespace if it doesn't exist
+    - echo "Creating namespace if it doesn't exist..."
+    - kubectl create namespace "$GKE_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+
+    # Create GitLab registry secret for GKE
+    - echo "Creating GitLab Container Registry secret for GKE..."
+    - |
+      kubectl delete secret gitlab-registry-secret -n ${GKE_NAMESPACE} --ignore-not-found=true
+      kubectl create secret docker-registry gitlab-registry-secret \
+        --docker-server=$CI_REGISTRY \
+        --docker-username=$CI_REGISTRY_USER \
+        --docker-password=$GITLAB_PERSONAL_TOKEN \
+        -n ${GKE_NAMESPACE} \
+        --dry-run=client -o yaml | kubectl apply -f -
+
+    # Patch image tag with commit SHA
+    - echo "Patching image with SHA $CI_COMMIT_SHORT_SHA"
+    - cd k8s/overlays/gke
+    - kustomize edit set image monitoring-backend=registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring:$CI_COMMIT_SHORT_SHA
+    - cd -
+
+    # Kustomize build and apply
+    - echo "Building Kustomize overlay..."
+    - kustomize build k8s/overlays/gke | tee kustomize-output.yaml | kubectl apply -f -
+
+    # Ensure ManagedCertificate exists (only create if missing).
+    - echo "Ensuring ManagedCertificate exists..."
+    - |
+      if ! kubectl get managedcertificate monitoring-backend-ssl-cert -n "$GKE_NAMESPACE" > /dev/null 2>&1; then
+        echo "Creating ManagedCertificate..."
+        kubectl apply -f k8s/overlays/gke/managed-cert.yaml
+      else
+        echo "ManagedCertificate already exists. Skipping creation."
+      fi
+
+    # Ensure Ingress exists (only create if missing)
+    - echo "Ensuring Ingress exists..."
+    - |
+      if ! kubectl get ingress monitoring-backend-ingress -n "$GKE_NAMESPACE" > /dev/null 2>&1; then
+        echo "Creating Ingress..."
+        kubectl apply -f k8s/ingress/gke-ingress.yaml
+      else
+        echo "Ingress already exists. Skipping creation."
+      fi
+
+    # Wait for rollout to complete.
+    - echo "Waiting for rollout to complete..."
+    - kubectl rollout status deployment/monitoring-backend -n "$GKE_NAMESPACE" --timeout=300s
+
+    # Resources + logs.
+    - echo "=== Resources ==="
+    - kubectl get all -n "$GKE_NAMESPACE"
+    - echo "=== Describe pods ==="
+    - kubectl describe pods -n "$GKE_NAMESPACE"
+    - echo "=== Logs (latest) ==="
+    - kubectl logs -l app=monitoring-backend -n "$GKE_NAMESPACE" --tail=100 --ignore-errors
+
+  rules:
+    - if: $CI_COMMIT_BRANCH == "experiment"
+
+deploy_prometheus_gke:
+  <<: *monitoring_gke_deploy
+  stage: deploy-gke
+  script:
+    - echo "Deploying Prometheus to GKE monitoring namespace..."
+    - kustomize build k8s/overlays/gke/monitoring | kubectl apply -f -
+  rules:
+    - if: $CI_COMMIT_BRANCH == "experiment"
+
+
+
+
