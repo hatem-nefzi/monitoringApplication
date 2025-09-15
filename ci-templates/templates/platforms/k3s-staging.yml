@@ -2,7 +2,6 @@ include:
   - local: "ci-templates/templates/core/.gitlab-ci-kubernetes.yml"
   - local: "ci-templates/templates/shared/variables/staging.yml"
   - local: "ci-templates/templates/shared/variables/computed.yml"
-  - local: "ci-templates/templates/shared/variables/k8s-scripts.yml"
   - local: "ci-templates/templates/core/.gitlab-ci-security.yml" # Pour sign_image et verify_image
 
 deploy:staging:
