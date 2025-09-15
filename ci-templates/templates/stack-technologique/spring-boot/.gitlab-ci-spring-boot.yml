@@ -1,22 +1,15 @@
 # templates/spring-boot/.gitlab-ci-spring-boot.yml
 include:
-  # Core templates 
-  - project: 'demo/ci-templates'
-    ref: 'main'
-    file:
-      - '/templates/core/.gitlab-ci-foundation.yml'
-      - '/templates/core/.gitlab-ci-build.yml'
-      - '/templates/core/.gitlab-ci-quality.yml'
-      - '/templates/core/.gitlab-ci-security.yml'
-      - '/templates/core/.gitlab-ci-docker.yml'
-      - '/templates/core/.gitlab-ci-tests.yml'
-      - '/templates/core/.gitlab-ci-kubernetes.yml'
-      
+  # Core templates
+  - local: 'ci-templates/templates/core/.gitlab-ci-foundation.yml'
+  - local: 'ci-templates/templates/core/.gitlab-ci-build.yml'
+  - local: 'ci-templates/templates/core/.gitlab-ci-quality.yml'
+  - local: 'ci-templates/templates/core/.gitlab-ci-security.yml'
+  - local: 'ci-templates/templates/core/.gitlab-ci-docker.yml'
+  - local: 'ci-templates/templates/core/.gitlab-ci-tests.yml'
+  - local: 'ci-templates/templates/core/.gitlab-ci-kubernetes.yml'
   # Variables Spring Boot
-  - project: 'demo/ci-templates'
-    ref: 'main'
-    file:
-      - '/shared/variables/spring-boot-defaults.yml'
+  - local: 'ci-templates/templates/shared/variables/spring-boot-defaults.yml'
 
 # === JOBS SPÉCIFIQUES SPRING BOOT ===
 # (Seulement ce qui est vraiment spécifique)
