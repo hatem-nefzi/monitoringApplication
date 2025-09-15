@@ -132,7 +132,7 @@ verify_image:
     CERTIFICATE_OIDC_ISSUER: "${PROJECT_OIDC_ISSUER:-${CERTIFICATE_OIDC_ISSUER}}"
   script:
     - echo "=== VERIFYING IMAGE SIGNATURE ==="
-    - echo "Digest to verify: $IMAGE_DIGEST"
+    - echo "Digest to verify $IMAGE_DIGEST"
     - |
       cosign verify "$IMAGE_DIGEST" \
         --certificate-identity-regexp="$CERTIFICATE_IDENTITY" \
