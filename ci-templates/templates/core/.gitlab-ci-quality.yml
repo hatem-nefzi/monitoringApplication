@@ -6,7 +6,7 @@ include:
 
 # SonarQube analysis - Pipeline-as-a-Platform: délégation au conteneur Maven+SonarQube
 sonarqube_scan:
-  <<: *maven_definition
+  extends: .maven_definition
   stage: sonarqube
   needs: ["build"]
   variables:
