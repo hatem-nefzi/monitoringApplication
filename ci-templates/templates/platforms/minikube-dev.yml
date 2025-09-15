@@ -5,7 +5,7 @@ include:
 
 deploy:dev:
   extends: .k8s_job
-  stage: deploy-dev
+  stage: deploy-staging
   variables:
     TARGET_NAMESPACE: "$ENVIRONMENT_DEV"
     OVERLAY_DIR: "k8s/overlays/development"

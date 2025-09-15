@@ -8,7 +8,7 @@ deploy:staging:
   extends:
     - .k8s_job
     - .verify_before_deploy
-  stage: deploy-staging
+  stage: deploy-production
   variables:
     TARGET_NAMESPACE: "$ENVIRONMENT_STAGING"
     OVERLAY_DIR: "k8s/overlays/staging"
