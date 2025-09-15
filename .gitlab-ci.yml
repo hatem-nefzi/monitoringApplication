@@ -4,7 +4,7 @@ include:
   # template springboot incluse
   - local: 'ci-templates/templates/stack-technologique/spring-boot/.gitlab-ci-spring-boot.yml'
   - local: 'ci-templates/templates/shared/variables/dev.yml'
-  - local: 'ci-templates/templates/shared/variables/prod.yml'
+  - local: 'ci-templates/templates/shared/variables/staging.yml'
   - local: 'ci-templates/templates/shared/variables/gke.yml'
   - local: 'ci-templates/templates/platforms/minikube-dev.yml'
   - local: 'ci-templates/templates/platforms/k3s-staging.yml'
