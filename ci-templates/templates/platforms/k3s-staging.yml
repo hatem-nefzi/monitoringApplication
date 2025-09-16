@@ -42,4 +42,4 @@ deploy:staging:
   script:
     - eval "$K8S_PREPARE_SCRIPT"
     - eval "$K8S_APPLY_OVERLAY_SCRIPT"
-  needs: ["verify_image"]
+  needs: ["verify_signatures"]
