@@ -45,30 +45,24 @@ variables:
     - echo "✅ Image signed successfully!"
     - echo "   Digest $IMAGE_DIGEST"
 
-# Image verification template - flexible and reusable
+# Image verification template - clean and simple
 .verify_image_template:
   extends: .cosign_base
   stage: docker_security
-  variables:
-    # Allow project-specific certificate identity and OIDC issuer
-    CERTIFICATE_IDENTITY: "${PROJECT_CERT_IDENTITY:-${DEFAULT_CERT_IDENTITY}}"
-    CERTIFICATE_OIDC_ISSUER: "${PROJECT_OIDC_ISSUER:-${DEFAULT_OIDC_ISSUER}}"
   needs:
     - job: docker_publish
       artifacts: true
     - job: sign_images
   script:
-    - echo "=== COSIGN LOGIN TO GITLAB REGISTRY ==="
+    - export CERT_ID="${PROJECT_CERT_IDENTITY:-$DEFAULT_CERT_IDENTITY}"
+    - export OIDC_ISSUER="${PROJECT_OIDC_ISSUER:-$DEFAULT_OIDC_ISSUER}"
     - cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
-    - echo "=== VERIFYING IMAGE SIGNATURE ==="
-    - echo "Certificate Identity $CERTIFICATE_IDENTITY"
-    - echo "OIDC Issuer $CERTIFICATE_OIDC_ISSUER"
-    - echo "Digest to verify $IMAGE_DIGEST"
+    - echo "Verifying signature for $IMAGE_DIGEST"
     - |
       cosign verify "$IMAGE_DIGEST" \
-        --certificate-identity="$CERTIFICATE_IDENTITY" \
-        --certificate-oidc-issuer="$CERTIFICATE_OIDC_ISSUER"
-    - echo "✅ Signature verification succeeded for digest $IMAGE_DIGEST"
+        --certificate-identity="$CERT_ID" \
+        --certificate-oidc-issuer="$OIDC_ISSUER"
+    - echo "✅ Signature verification succeeded"
 
 # Pre-deployment verification template
 .verify_before_deploy:
