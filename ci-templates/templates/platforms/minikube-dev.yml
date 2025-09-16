@@ -9,10 +9,9 @@ deploy:dev:
   variables:
     TARGET_NAMESPACE: "$ENVIRONMENT_DEV"
     OVERLAY_DIR: "k8s/overlays/staging"
-    KUBECTL_VERSION: "v1.32.3"
     KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
   before_script:
-    - !reference [.k8s_setup_script, script]
+    - !reference [.k8s_job, before_script]  # ✅ Inherit base setup
     - apk add --no-cache ca-certificates
     - mkdir -p "$(dirname "$KUBECONFIG")"
     - |
@@ -27,7 +26,7 @@ deploy:dev:
       - context:
           cluster: minikube
           user: gitlab-ci
-          namespace: ${ENVIRONMENT_STAGING}
+          namespace: ${TARGET_NAMESPACE}  # ✅ Fixed namespace
         name: minikube
       current-context: minikube
       kind: Config
@@ -36,8 +35,6 @@ deploy:dev:
         user:
           token: ${MINIKUBE_TOKEN}
       EOF
-    - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
-    - chmod +x kubectl && mv kubectl /usr/local/bin/
     - kubectl cluster-info
   script:
     - !reference [.k8s_prepare_script, script]
