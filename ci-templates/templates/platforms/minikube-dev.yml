@@ -5,7 +5,6 @@ include:
 
 deploy:dev:
   extends: .k8s_job
-  entrypoint: [""]
   stage: deploy-staging
   variables:
     TARGET_NAMESPACE: "$ENVIRONMENT_DEV"

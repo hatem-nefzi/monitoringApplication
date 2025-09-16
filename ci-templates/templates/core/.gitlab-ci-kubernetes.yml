@@ -33,7 +33,7 @@ include:
 # ---------- Base job you can extend ----------
 .k8s_job:
   extends: .default_job
-  image: bitnami/kubectl:latest
+  image: alpine/k8s:latest 
   variables:
     KUSTOMIZE_VERSION: "v5.4.3"
   before_script:
