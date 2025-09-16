@@ -34,7 +34,6 @@ include:
 .k8s_job:
   extends: .default_job
   image: bitnami/kubectl:latest
-  entrypoint: [""]
   variables:
     KUSTOMIZE_VERSION: "v5.4.3"
   before_script:
