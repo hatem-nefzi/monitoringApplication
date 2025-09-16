@@ -8,7 +8,7 @@ deploy:dev:
   stage: deploy-staging
   variables:
     TARGET_NAMESPACE: "$ENVIRONMENT_DEV"
-    OVERLAY_DIR: "k8s/overlays/development"
+    OVERLAY_DIR: "k8s/overlays/staging"
     KUBECTL_VERSION: "v1.32.3"
     KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
   before_script:
