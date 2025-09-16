@@ -38,11 +38,11 @@ variables:
     - echo "=== COSIGN LOGIN TO GITLAB REGISTRY ==="
     - cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
     - echo "=== SIGNING IMAGE WITH COSIGN ==="
-    - echo "Certificate Identity: $CERTIFICATE_IDENTITY"
-    - echo "Digest to sign: $IMAGE_DIGEST"
+    - echo "Certificate Identity $CERTIFICATE_IDENTITY"
+    - echo "Digest to sign $IMAGE_DIGEST"
     - cosign sign --yes "$IMAGE_DIGEST"
     - echo "✅ Image signed successfully!"
-    - echo "   Digest: $IMAGE_DIGEST"
+    - echo "   Digest $IMAGE_DIGEST"
 
 # Image verification template - flexible and reusable
 .verify_image_template:
@@ -60,14 +60,14 @@ variables:
     - echo "=== COSIGN LOGIN TO GITLAB REGISTRY ==="
     - cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
     - echo "=== VERIFYING IMAGE SIGNATURE ==="
-    - echo "Certificate Identity: $CERTIFICATE_IDENTITY"
-    - echo "OIDC Issuer: $CERTIFICATE_OIDC_ISSUER"
-    - echo "Digest to verify: $IMAGE_DIGEST"
+    - echo "Certificate Identity $CERTIFICATE_IDENTITY"
+    - echo "OIDC Issuer $CERTIFICATE_OIDC_ISSUER"
+    - echo "Digest to verify $IMAGE_DIGEST"
     - |
       cosign verify "$IMAGE_DIGEST" \
         --certificate-identity="$CERTIFICATE_IDENTITY" \
         --certificate-oidc-issuer="$CERTIFICATE_OIDC_ISSUER"
-    - echo "✅ Signature verification succeeded for digest: $IMAGE_DIGEST"
+    - echo "✅ Signature verification succeeded for digest $IMAGE_DIGEST"
 
 # Pre-deployment verification template
 .verify_before_deploy:
