@@ -9,3 +9,10 @@ variables:
   # Par défaut on pousse sur GitLab Container Registry
   REGISTRY_HOST: "$CI_REGISTRY"
   REGISTRY_IMAGE: "$CI_REGISTRY_IMAGE"
+  COSIGN_VERSION: "v2.2.4"
+  COSIGN_EXPERIMENTAL: "1"
+  # Use GitLab's built-in variables for identity
+  CERTIFICATE_IDENTITY: "${CI_SERVER_URL}/${CI_PROJECT_PATH}"
+  CERTIFICATE_OIDC_ISSUER: "${CI_SERVER_URL}"
+  # Project-specific override (keep this in your main .gitlab-ci.yml)
+  PROJECT_CERT_IDENTITY: "hatemnbouali111000@gmail.com"

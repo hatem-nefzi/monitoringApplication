@@ -1,0 +1,107 @@
+# ===============================================
+# File: ci-templates/templates/core/.gitlab-ci-image-signing.yml
+# Purpose: Container image signing and verification with Cosign
+# ===============================================
+
+variables:
+  COSIGN_VERSION: "v2.2.4"
+  COSIGN_EXPERIMENTAL: "1"
+
+# Base Cosign setup template
+.cosign_base:
+  tags: [docker]
+  image: hatemnefzi/maven-docker:latest
+  variables:
+    DOCKER_TLS_CERTDIR: ""
+    COSIGN_EXPERIMENTAL: "1"
+    # Default certificate identity - can be overridden per project
+    DEFAULT_CERT_IDENTITY: "hatemnbouali111000@gmail.com"
+    DEFAULT_OIDC_ISSUER: "https://accounts.google.com"
+  before_script:
+    - apt-get update && apt-get install -y curl wget
+    - wget "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+    - mv cosign-linux-amd64 /usr/local/bin/cosign
+    - chmod +x /usr/local/bin/cosign
+
+# Image signing template - flexible and reusable
+.sign_image_template:
+  extends: .cosign_base
+  stage: docker_security
+  variables:
+    # Allow project-specific certificate identity
+    CERTIFICATE_IDENTITY: "${PROJECT_CERT_IDENTITY:-${DEFAULT_CERT_IDENTITY}}"
+  needs: 
+    - job: docker_publish
+      artifacts: true
+    - job: container_scan
+  script:
+    - echo "=== COSIGN LOGIN TO GITLAB REGISTRY ==="
+    - cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+    - echo "=== SIGNING IMAGE WITH COSIGN ==="
+    - echo "Certificate Identity: $CERTIFICATE_IDENTITY"
+    - echo "Digest to sign: $IMAGE_DIGEST"
+    - cosign sign --yes "$IMAGE_DIGEST"
+    - echo "✅ Image signed successfully!"
+    - echo "   Digest: $IMAGE_DIGEST"
+
+# Image verification template - flexible and reusable
+.verify_image_template:
+  extends: .cosign_base
+  stage: docker_security
+  variables:
+    # Allow project-specific certificate identity and OIDC issuer
+    CERTIFICATE_IDENTITY: "${PROJECT_CERT_IDENTITY:-${DEFAULT_CERT_IDENTITY}}"
+    CERTIFICATE_OIDC_ISSUER: "${PROJECT_OIDC_ISSUER:-${DEFAULT_OIDC_ISSUER}}"
+  needs:
+    - job: docker_publish
+      artifacts: true
+    - job: sign_images
+  script:
+    - echo "=== COSIGN LOGIN TO GITLAB REGISTRY ==="
+    - cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+    - echo "=== VERIFYING IMAGE SIGNATURE ==="
+    - echo "Certificate Identity: $CERTIFICATE_IDENTITY"
+    - echo "OIDC Issuer: $CERTIFICATE_OIDC_ISSUER"
+    - echo "Digest to verify: $IMAGE_DIGEST"
+    - |
+      cosign verify "$IMAGE_DIGEST" \
+        --certificate-identity="$CERTIFICATE_IDENTITY" \
+        --certificate-oidc-issuer="$CERTIFICATE_OIDC_ISSUER"
+    - echo "✅ Signature verification succeeded for digest: $IMAGE_DIGEST"
+
+# Pre-deployment verification template
+.verify_before_deploy:
+  image: alpine:latest
+  variables:
+    CERTIFICATE_IDENTITY: "${PROJECT_CERT_IDENTITY:-${DEFAULT_CERT_IDENTITY}}"
+    CERTIFICATE_OIDC_ISSUER: "${PROJECT_OIDC_ISSUER:-${DEFAULT_OIDC_ISSUER}}"
+  before_script:
+    - apk add --no-cache curl wget
+    - wget "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+    - mv cosign-linux-amd64 /usr/local/bin/cosign
+    - chmod +x /usr/local/bin/cosign
+    - cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+    - echo "🔒 Verifying image signature before deployment..."
+    - |
+      cosign verify "$IMAGE_DIGEST" \
+        --certificate-identity="$CERTIFICATE_IDENTITY" \
+        --certificate-oidc-issuer="$CERTIFICATE_OIDC_ISSUER"
+    - echo "✅ Image signature verified!"
+
+# Ready-to-use jobs (optional - projects can use templates directly)
+
+# Default signing job
+sign_images:
+  extends: .sign_image_template
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^(main|develop|experiment)$/
+
+# Default verification job
+verify_signatures:
+  extends: .verify_image_template
+  needs:
+    - job: docker_publish
+      artifacts: true
+    - job: sign_images
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^(main|develop|experiment)$/
