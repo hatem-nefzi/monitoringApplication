@@ -1,7 +1,7 @@
 # Minikube (staging stage) — non-secrets only. Tokens/endpoints via CI vars.
 
 variables:
-  ENVIRONMENT_DEV: "development"
+  ENVIRONMENT_DEV: "staging"
   MINIKUBE_IP: "192.168.49.2"
   MINIKUBE_PORT: "8443"
   PROMETHEUS_DEV_URL: "http://$MINIKUBE_IP:30090"
