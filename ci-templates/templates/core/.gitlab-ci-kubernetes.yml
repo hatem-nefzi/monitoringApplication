@@ -5,8 +5,6 @@ include:
 .k8s_setup_script:
   script:
     - apk add --no-cache curl jq bash gettext
-    - curl -LO "https://dl.k8s.io/release/v1.32.3/bin/linux/amd64/kubectl"  # ✅ Add this
-    - chmod +x kubectl && mv kubectl /usr/local/bin/  # ✅ Add this
     - curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
     - mv kustomize /usr/local/bin/
     - kustomize version
@@ -35,7 +33,7 @@ include:
 # ---------- Base job you can extend ----------
 .k8s_job:
   extends: .default_job
-  image: alpine/k8s:1.28.13 
+  image: dtzar/helm-kubectl:latest 
   variables:
     KUSTOMIZE_VERSION: "v5.4.3"
   before_script:
