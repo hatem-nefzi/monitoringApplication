@@ -35,4 +35,4 @@ deploy:staging:
   script:
     - !reference [.k8s_prepare_script, script]
     - !reference [.k8s_apply_overlay_script, script]
-  needs: ["verify_signatures"]
+ 
