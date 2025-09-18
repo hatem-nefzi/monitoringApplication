@@ -43,5 +43,5 @@ deploy:staging:
     - env | grep -E "(IMAGE|CI_COMMIT|TAG)"
   script:
     - !reference [.k8s_prepare_script, script]
-    - !reference [.k8s_apply_overlay_script, script]
+    - !reference [.k8s_gitops_script, script]
  
