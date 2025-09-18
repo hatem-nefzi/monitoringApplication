@@ -2,21 +2,21 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: staging
 resources:
-  - ../../base
+- ../../base
   
 patches:
-  - path: patches/deployment-patch.yaml
-  - path: patches/cluster-rolebinding-patch.yaml
+- path: patches/deployment-patch.yaml
+- path: patches/cluster-rolebinding-patch.yaml
 images:
-  - name: monitoring-backend
-    newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
-    newTag: latest
+- name: monitoring-backend
+  newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
+  newTag: 7ed4bf30
 
     
 configMapGenerator:
-  - name: monitoring-backend-config
-    behavior: replace
-    literals:
-      - LOG_LEVEL=DEBUG
-      - ENVIRONMENT=staging
-      - SERVER_PORT=9090
+- behavior: replace
+  literals:
+  - LOG_LEVEL=DEBUG
+  - ENVIRONMENT=staging
+  - SERVER_PORT=9090
+  name: monitoring-backend-config
