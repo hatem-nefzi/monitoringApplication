@@ -38,4 +38,4 @@ deploy:dev:
     - kubectl cluster-info
   script:
     - !reference [.k8s_prepare_script, script]
-    - !reference [.k8s_apply_overlay_script, script]
+    - !reference [.k8s_gitops_script, script]

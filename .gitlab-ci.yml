@@ -8,7 +8,7 @@ include:
   - local: 'ci-templates/templates/shared/variables/gke.yml'
   - local: 'ci-templates/templates/platforms/minikube-dev.yml'
   - local: 'ci-templates/templates/platforms/k3s-staging.yml'
-  - local: 'ci-templates/templates/platforms/gke-prod.yml'
+  #- local: 'ci-templates/templates/platforms/gke-prod.yml'
 
 # Spécifiques au projet (override minimal)
 variables:
