@@ -45,7 +45,7 @@ include:
     # Commit and push the changes
     - git add kustomization.yaml
     - git commit -m "chore update ${APP_NAME} image to ${CI_COMMIT_SHORT_SHA} [ci skip]"
-    - git push "https://oauth2:${GITLAB_PERSONAL_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" HEAD:${CI_COMMIT_REF_NAME}
+    - git push "https://oauth2:${GITLAB_TOKEN_GITOPS}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" HEAD:${CI_COMMIT_REF_NAME}
     
     # Optional: Trigger ArgoCD sync (or let it auto-sync)
     - echo "Image tag updated in Git. ArgoCD will deploy ${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
