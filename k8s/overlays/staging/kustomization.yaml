@@ -8,12 +8,10 @@ patches:
 - path: patches/deployment-patch.yaml
 - path: patches/cluster-rolebinding-patch.yaml
 
-
-# ❌ REMOVE THIS ENTIRE SECTION - CI will handle it
-# images:
-#   - name: monitoring-backend
-#     newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
-#     newTag: latest
+images:
+- name: monitoring-backend
+  newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
+  newTag: latest
 
     
 configMapGenerator:
@@ -23,7 +21,3 @@ configMapGenerator:
   - ENVIRONMENT=staging
   - SERVER_PORT=9090
   name: monitoring-backend-config
-images:
-- name: monitoring-backend
-  newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
-  newTag: "06495846"
