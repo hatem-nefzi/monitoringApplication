@@ -34,4 +34,4 @@ patches:
 images:
 - name: monitoring-backend
   newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
-  newTag: f52ae74d
+  newTag: 7c5d05ec
