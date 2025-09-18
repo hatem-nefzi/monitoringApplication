@@ -23,3 +23,7 @@ configMapGenerator:
   - ENVIRONMENT=staging
   - SERVER_PORT=9090
   name: monitoring-backend-config
+images:
+- name: monitoring-backend
+  newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
+  newTag: "06495846"
