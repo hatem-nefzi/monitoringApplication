@@ -26,4 +26,4 @@ configMapGenerator:
 images:
 - name: monitoring-backend
   newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
-  newTag: "06495846"
+  newTag: 7c5d05ec
