@@ -32,6 +32,10 @@ deploy:staging:
           client-key-data: ${K3S_CLIENT_KEY}
       EOF
     - kubectl cluster-info
+    # DEBUG: Check what variables are available
+    - echo "IMAGE_VERSIONED = ${IMAGE_VERSIONED}"
+    - echo "CI_COMMIT_SHORT_SHA = ${CI_COMMIT_SHORT_SHA}"
+    - env | grep -E "(IMAGE|CI_COMMIT|TAG)"
   script:
     - !reference [.k8s_prepare_script, script]
     - !reference [.k8s_apply_overlay_script, script]
