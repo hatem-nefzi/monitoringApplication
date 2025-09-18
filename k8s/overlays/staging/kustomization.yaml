@@ -5,6 +5,8 @@ resources:
 - ../../base
   
 patches:
+- path: patches/deployment-patch.yaml
+- path: patches/cluster-rolebinding-patch.yaml
   - path: patches/deployment-patch.yaml
   - path: patches/cluster-rolebinding-patch.yaml
 
