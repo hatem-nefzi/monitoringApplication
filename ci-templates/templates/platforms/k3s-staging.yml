@@ -1,3 +1,8 @@
+include:
+  - local: "ci-templates/templates/core/.gitlab-ci-kubernetes.yml"
+  - local: "ci-templates/templates/shared/variables/dev.yml"
+  - local: "ci-templates/templates/shared/variables/computed.yml"
+
 deploy:staging:
   extends:
     - .k8s_job
