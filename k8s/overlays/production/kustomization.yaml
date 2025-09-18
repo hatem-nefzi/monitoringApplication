@@ -13,11 +13,12 @@ patchesStrategicMerge:
   - patches/deployment-patch.yaml
   - patches/cluster-rolebinding-patch.yaml
 
-images:
-  - name: monitoring-backend
-    newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
-    newTag: latest
 
+# ❌ REMOVE THIS ENTIRE SECTION - it's being handled by CI
+# images:
+#   - name: monitoring-backend
+#     newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
+#     newTag: latest
 
 
 commonLabels:
