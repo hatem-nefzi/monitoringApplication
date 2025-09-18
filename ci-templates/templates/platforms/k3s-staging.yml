@@ -7,7 +7,7 @@ deploy:staging:
     OVERLAY_DIR: "k8s/overlays/production"
     KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
   before_script:
-    - !reference [.k8s_setup_script, script]  # Include the base setup
+    - !reference [.k8s_job, before_script]  # ✅ Inherit base setup
     - mkdir -p "$(dirname "$KUBECONFIG")"
     - |
       cat > "${KUBECONFIG}" <<EOF
