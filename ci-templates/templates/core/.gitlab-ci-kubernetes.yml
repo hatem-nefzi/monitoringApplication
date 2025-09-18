@@ -27,13 +27,18 @@ include:
   script:
     - cd "$OVERLAY_DIR"
     
-    # Update kustomization with the new image tag
-    - kustomize edit fix || true
-    - kustomize edit set image ${APP_NAME}=${IMAGE_VERSIONED}
+    
     
     # Configure git
     - git config --global user.email "gitlab-ci@${CI_PROJECT_NAMESPACE}.com"
     - git config --global user.name "GitLab CI Bot"
+
+    # Pull latest changes before pushing (handles concurrent jobs)
+    - git pull "https://oauth2:${GITLAB_TOKEN_GITOPS}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" ${CI_COMMIT_REF_NAME} --rebase || true
+    
+    # Update kustomization with the new image tag
+    - kustomize edit fix || true
+    - kustomize edit set image ${APP_NAME}=${IMAGE_VERSIONED}
     
     # Check if there are changes to commit
     - |
@@ -42,8 +47,6 @@ include:
         exit 0
       fi
 
-    # Pull latest changes before pushing (handles concurrent jobs)
-    - git pull "https://oauth2:${GITLAB_TOKEN_GITOPS}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" ${CI_COMMIT_REF_NAME} --rebase || true
     
    
     
