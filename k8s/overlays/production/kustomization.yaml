@@ -4,14 +4,11 @@ kind: Kustomization
 namespace: production
 
 resources:
-  - ../../base
-  - ../../monitoring  
-  - ingress.yaml
+- ../../base
+- ../../monitoring
+- ingress.yaml
   
 
-patchesStrategicMerge:
-  - patches/deployment-patch.yaml
-  - patches/cluster-rolebinding-patch.yaml
 
 # ❌ REMOVE THIS ENTIRE SECTION - CI will handle it
 # images:
@@ -19,13 +16,22 @@ patchesStrategicMerge:
 #     newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
 #     newTag: latest
 
-commonLabels:
-  environment: production
 
 configMapGenerator:
-  - name: monitoring-backend-config
-    behavior: merge
-    literals:
-      - LOG_LEVEL=WARN
-      - ENVIRONMENT=production
-      - SERVER_PORT=9090
+- behavior: merge
+  literals:
+  - LOG_LEVEL=WARN
+  - ENVIRONMENT=production
+  - SERVER_PORT=9090
+  name: monitoring-backend-config
+labels:
+- includeSelectors: true
+  pairs:
+    environment: production
+patches:
+- path: patches/deployment-patch.yaml
+- path: patches/cluster-rolebinding-patch.yaml
+images:
+- name: monitoring-backend
+  newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
+  newTag: f52ae74d
