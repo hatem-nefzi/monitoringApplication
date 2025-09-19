@@ -10,7 +10,7 @@ variables:
   # kustomize and kubectl versions
   KUSTOMIZE_VERSION: "v5.4.3"
   KUBECTL_VERSION: "v1.32.3"
-  # 🐳 Registry URLs (computed from CI vars)
+  # 🐳 Registry URLs (computed from CI vars).
 
   # 📁 Paths
   KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
