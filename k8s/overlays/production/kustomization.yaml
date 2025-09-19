@@ -17,7 +17,6 @@ resources:
 #     newTag: latest
 
 # bad commit for demo purposes only
-#another commit for demo purposes only
 
 
 configMapGenerator:
