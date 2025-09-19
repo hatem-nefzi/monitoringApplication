@@ -14,7 +14,7 @@ include:
 variables:
   APP_NAME: "monitoring-backend"
   APP_PORT: "9090"
-  # Sonar
+  # Sonar.
   SONAR_PROJECT_KEY: "monitoring-backend"
   SONAR_PROJECT_NAME: "monitoring-backend"
   # Cosign
