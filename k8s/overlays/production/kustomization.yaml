@@ -16,6 +16,8 @@ resources:
 #     newName: registry.proxiad-axe-seine.com/proxiad-academie/ops-monitoring
 #     newTag: latest
 
+# bad commit for demo purposes only
+
 
 configMapGenerator:
 - behavior: merge
