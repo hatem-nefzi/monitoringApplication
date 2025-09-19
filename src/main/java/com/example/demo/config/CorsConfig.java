@@ -7,6 +7,7 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 // Alternative: Specify exact origins if you need credentials
+//adding a comment in a code file to test gitops
 @Configuration
 public class CorsConfig {
 
