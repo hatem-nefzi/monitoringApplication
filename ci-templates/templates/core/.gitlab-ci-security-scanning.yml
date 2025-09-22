@@ -87,3 +87,21 @@ k8s_manifest_scan:
   rules:
     - if: $CI_COMMIT_BRANCH
 
+
+.container_scan_base:
+  extends: .default_job
+  stage: docker_security
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  script:
+    - echo "Scanning container image for vulnerabilities..."
+    - echo "Image $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+    - trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --insecure --output gl-container-scanning-report.json "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+  artifacts:
+    reports:
+      container_scanning: gl-container-scanning-report.json
+    when: always
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH
