@@ -5,14 +5,9 @@ metadata:
   namespace: production
   annotations:
     kubernetes.io/ingress.class: "traefik"
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    traefik.ingress.kubernetes.io/redirect-entry-point: https
+    traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   ingressClassName: traefik
-  tls:
-  - hosts:
-    - monitoring-backend.production.local
-    secretName: monitoring-backend-tls
   rules:
   - host: monitoring-backend.production.local
     http:
