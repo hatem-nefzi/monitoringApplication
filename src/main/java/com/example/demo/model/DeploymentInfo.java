@@ -12,6 +12,7 @@ public class DeploymentInfo {
     private int replicas;
     private int availableReplicas;
     private Map<String, String> labels;
+    private String creationTimestamp; // Add this line
 
     public DeploymentInfo(V1Deployment deployment) {
         this.name = deployment.getMetadata() != null ? deployment.getMetadata().getName() : "unknown";
@@ -30,5 +31,6 @@ public class DeploymentInfo {
         }
 
         this.labels = deployment.getMetadata() != null ? deployment.getMetadata().getLabels() : null;
+        this.creationTimestamp = deployment.getMetadata().getCreationTimestamp().toString(); // Add this line
     }
 }

@@ -152,10 +152,18 @@ public class KubernetesService {
     public List<DeploymentInfo> getAllDeployments(String namespace) throws ApiException {
     if (namespace != null && !namespace.isBlank()) {
         V1DeploymentList deploymentList = appsV1Api.listNamespacedDeployment(namespace, null, null, null, null, null, null, null, null, null, null);
-        return deploymentList.getItems().stream().map(DeploymentInfo::new).collect(Collectors.toList());
+        return deploymentList.getItems().stream().map(deployment -> {
+            DeploymentInfo info = new DeploymentInfo(deployment);
+            info.setCreationTimestamp(deployment.getMetadata().getCreationTimestamp().toString()); // Add this
+            return info;
+        }).collect(Collectors.toList());
     } else {
         V1DeploymentList deploymentList = appsV1Api.listDeploymentForAllNamespaces(null, null, null, null, null, null, null, null, null, null);
-        return deploymentList.getItems().stream().map(DeploymentInfo::new).collect(Collectors.toList());
+        return deploymentList.getItems().stream().map(deployment -> {
+            DeploymentInfo info = new DeploymentInfo(deployment);
+            info.setCreationTimestamp(deployment.getMetadata().getCreationTimestamp().toString()); // Add this
+            return info;
+        }).collect(Collectors.toList());
     }
 }
 
