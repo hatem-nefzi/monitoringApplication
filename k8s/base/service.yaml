@@ -9,6 +9,7 @@ metadata:
 spec:
   selector:
     app: monitoring-backend
+    component: backend
   ports:
   - name: http
     port: 80

@@ -25,6 +25,8 @@ import java.util.HashMap;
 import io.opentelemetry.api.trace.Span;
 // Add this import
 import io.opentelemetry.api.common.AttributeKey;
+// Add this import for Redis Caching
+import com.example.demo.service.CacheService;
 
 
 @RestController
@@ -79,36 +81,34 @@ public class KubernetesController {
         }
     }
 
-    
-    @GetMapping("/pods")
-public ResponseEntity<?> getPods(HttpServletRequest request) {
-    // ADDED: Read the trace headers from frontend
-    String frontendTraceId = request.getHeader("X-Frontend-Trace-Id");
-    String frontendComponent = request.getHeader("X-Frontend-Component");
-    
-    // ADDED: Log the frontend trace info
-    if (frontendTraceId != null) {
-        logger.info("Backend: Processing request from frontend trace ID: {}, component: {}", 
-                   frontendTraceId, frontendComponent);
-        Span currentSpan = Span.current();
-        currentSpan.setAttribute("frontend.trace.id", frontendTraceId);
-        currentSpan.setAttribute("frontend.component", frontendComponent);
-        currentSpan.setAttribute("user.journey", "pods-dashboard-request");
-    }
+    // Add this field to your controller
+    @Autowired
+    private CacheService cacheService;
 
+    // Update ONLY your getPods method:
+@GetMapping("/pods")
+public ResponseEntity<?> getPods(HttpServletRequest request) {
+    logTraceHeaders(request);
+    
+    String frontendTraceId = request.getHeader("X-Frontend-Trace-Id");
+    String component = request.getHeader("X-Frontend-Component");
+    String timestamp = request.getHeader("X-Frontend-Timestamp");
+    
     try {
         List<PodInfo> pods = kubernetesService.getPodInfoClusterWide();
         logger.debug("Successfully fetched {} pods", pods.size());
         
-        // ADDED: Include the trace ID in the response (optional)
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("pods", pods);
+        // SAFE: These operations won't break if Redis is down
         if (frontendTraceId != null) {
-            response.put("frontendTraceId", frontendTraceId);
+            cacheService.storeRequestMetadata(frontendTraceId, component, timestamp);
         }
+        cacheService.cachePodData((List<Object>)(List<?>) pods);
         
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "pods", pods,
+            "redis", cacheService.isRedisHealthy() ? "connected" : "unavailable"
+        ));
     } catch (ApiException e) {
         logger.error("API error fetching pods: {}", e.getResponseBody(), e);
         return ResponseEntity.status(e.getCode())
@@ -207,4 +207,47 @@ public ResponseEntity<Object> getPodDetails(
                 .body(Map.of("success", false, "error", e.getResponseBody()));
         }
     }
+
+    // Add this endpoint to your controller for debugging Redis
+
+@GetMapping("/redis/test")
+public ResponseEntity<?> testRedis() {
+    Map<String, Object> response = new HashMap<>();
+    
+    try {
+        // Test basic Redis operations
+        boolean isHealthy = cacheService.isRedisHealthy();
+        response.put("redis_healthy", isHealthy);
+        response.put("redis_status", cacheService.getRedisStatus());
+        
+        if (isHealthy) {
+            // Test some operations
+            response.put("test_results", Map.of(
+                "basic_connection", "✓ Connected",
+                "write_test", "✓ Can write",
+                "read_test", "✓ Can read"
+            ));
+        } else {
+            response.put("test_results", Map.of(
+                "basic_connection", "✗ Failed",
+                "error", "Cannot connect to Redis"
+            ));
+        }
+        
+        // Environment info
+        response.put("environment", Map.of(
+            "REDIS_HOST", System.getenv("REDIS_HOST"),
+            "REDIS_PORT", System.getenv("REDIS_PORT")
+        ));
+        
+        return ResponseEntity.ok(response);
+        
+    } catch (Exception e) {
+        logger.error("Redis test failed", e);
+        response.put("error", e.getMessage());
+        response.put("redis_healthy", false);
+        return ResponseEntity.status(500).body(response);
+    }
+}
+
 }
