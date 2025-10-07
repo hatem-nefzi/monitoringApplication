@@ -9,7 +9,9 @@ public class ContainerInfo {
     private boolean ready;
     private int restartCount;
     private String state; // "Running", "Waiting", "Terminated", "Unknown"
-
+      // ✅ ADD THIS
+    public ContainerInfo() {
+    }
     public ContainerInfo(String name, String image, boolean ready, int restartCount, String state) {
         this.name = name;
         this.image = image;

@@ -14,52 +14,36 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 @Configuration
 public class RedisConfig {
-    
     private static final Logger logger = LoggerFactory.getLogger(RedisConfig.class);
-    
-    @Value("${redis.host:redis-service}")
-    private String redisHost;
-    
-    @Value("${redis.port:6379}")
-    private int redisPort;
-    
+
+    // ADD THIS METHOD - This is what's missing!
     @Bean
-    public RedisConnectionFactory redisConnectionFactory() {
-        logger.info("Configuring Redis connection to {}:{}", redisHost, redisPort);
+    public LettuceConnectionFactory redisConnectionFactory(
+            @Value("${spring.redis.host}") String host,
+            @Value("${spring.redis.port}") int port) {
+        
+        logger.info("Creating Redis connection factory for {}:{}", host, port);
         
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
-        config.setHostName(redisHost);
-        config.setPort(redisPort);
+        config.setHostName(host);
+        config.setPort(port);
         
-        LettuceConnectionFactory factory = new LettuceConnectionFactory(config);
-        
-        // Test the connection
-        try {
-            factory.afterPropertiesSet();
-            logger.info("Redis connection factory initialized successfully");
-        } catch (Exception e) {
-            logger.error("Failed to initialize Redis connection factory: {}", e.getMessage());
-        }
-        
-        return factory;
+        return new LettuceConnectionFactory(config);
     }
-    
+
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
-        logger.info("Creating RedisTemplate bean");
-        
+        logger.info("Creating RedisTemplate with connection factory: {}",
+                connectionFactory.getClass().getSimpleName());
+
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
-        
-        // Set serializers
         template.setKeySerializer(new StringRedisSerializer());
         template.setHashKeySerializer(new StringRedisSerializer());
         template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
         template.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
-        
         template.afterPropertiesSet();
-        
-        // Test the template
+
         try {
             template.opsForValue().set("test-connection", "ok");
             String result = (String) template.opsForValue().get("test-connection");
@@ -68,7 +52,7 @@ public class RedisConfig {
         } catch (Exception e) {
             logger.error("Redis template test failed: {}", e.getMessage());
         }
-        
+
         return template;
     }
 }

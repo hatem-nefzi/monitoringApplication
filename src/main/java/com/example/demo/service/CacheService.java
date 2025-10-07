@@ -7,6 +7,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.stereotype.Service;
 
+import com.example.demo.model.PodInfo;
+
 import javax.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.List;
@@ -136,4 +138,37 @@ public class CacheService {
         }
         return redisAvailable ? "Available" : "Unavailable";
     }
+
+    public List<PodInfo> getCachedPodData() {
+    if (redisTemplate == null || !redisAvailable) {
+        logger.info("Redis not available - returning null for cache lookup");
+        return null;
+    }
+    
+    try {
+        logger.info("Attempting to retrieve cached pod data from Redis");
+        
+        Object cached = redisTemplate.opsForValue().get("pods:all");
+        
+        if (cached == null) {
+            logger.info("Cache miss - no data found for key 'pods:all'");
+            return null;
+        }
+        
+        logger.info("Cache hit - retrieved data of type: {}", cached.getClass().getName());
+        
+        if (cached instanceof List) {
+            List<PodInfo> pods = (List<PodInfo>) cached;
+            logger.info("Successfully deserialized {} pods from cache", pods.size());
+            return pods;
+        } else {
+            logger.warn("Cached data is not a List, it's a: {}", cached.getClass());
+            return null;
+        }
+        
+    } catch (Exception e) {
+        logger.error("Error retrieving cached pod data: {}", e.getMessage(), e);
+        return null;
+    }
+}
 }

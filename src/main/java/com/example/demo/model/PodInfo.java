@@ -14,6 +14,9 @@ public class PodInfo {
     private String nodeIP;
     private List<ContainerInfo> containers;
     private Map<String, String> metrics;  // New field
+    // ✅ ADD THIS - Default constructor for Jackson
+    public PodInfo() {
+    }
 
     public PodInfo(String name, String namespace, String status, 
                  String nodeName, String nodeIP, List<ContainerInfo> containers, Map<String, String> metrics) {

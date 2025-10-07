@@ -89,20 +89,30 @@ public class KubernetesController {
 @GetMapping("/pods")
 public ResponseEntity<?> getPods(HttpServletRequest request) {
     logTraceHeaders(request);
-    
     String frontendTraceId = request.getHeader("X-Frontend-Trace-Id");
     String component = request.getHeader("X-Frontend-Component");
     String timestamp = request.getHeader("X-Frontend-Timestamp");
     
     try {
-        List<PodInfo> pods = kubernetesService.getPodInfoClusterWide();
-        logger.debug("Successfully fetched {} pods", pods.size());
+        // ✅ CHECK CACHE FIRST!
+        List<PodInfo> pods = cacheService.getCachedPodData();
         
-        // SAFE: These operations won't break if Redis is down
+        if (pods == null) {
+            // Cache miss - fetch from Kubernetes
+            logger.info("Cache miss - fetching pods from Kubernetes");
+            pods = kubernetesService.getPodInfoClusterWide();
+            logger.debug("Successfully fetched {} pods from Kubernetes", pods.size());
+            
+            // Cache for next time
+            cacheService.cachePodData((List<Object>)(List<?>) pods);
+        } else {
+            logger.info("Cache hit - returning {} cached pods", pods.size());
+        }
+        
+        // Store request metadata if provided
         if (frontendTraceId != null) {
             cacheService.storeRequestMetadata(frontendTraceId, component, timestamp);
         }
-        cacheService.cachePodData((List<Object>)(List<?>) pods);
         
         return ResponseEntity.ok(Map.of(
             "success", true,
@@ -119,26 +129,6 @@ public ResponseEntity<?> getPods(HttpServletRequest request) {
             ));
     }
 }
-
-    @ExceptionHandler(ApiException.class)
-    public ResponseEntity<ErrorResponse> handleApiException(ApiException e) {
-        logger.error("Kubernetes API Exception: {}", e.getResponseBody(), e);
-        return ResponseEntity.status(e.getCode())
-            .body(new ErrorResponse(
-                "Kubernetes API Error: " + e.getMessage(),
-                e.getCode()
-            ));
-    }
-
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGeneralException(Exception e) {
-        logger.error("Unexpected error", e);
-        return ResponseEntity.internalServerError()
-            .body(new ErrorResponse(
-                "Internal Error: " + e.getMessage(),
-                500
-            ));
-    }
     @GetMapping("/namespaces")
 public ResponseEntity<Map<String, Object>> getNamespaces() {
     try {
