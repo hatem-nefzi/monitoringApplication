@@ -3,45 +3,40 @@ include:
   - local: "ci-templates/templates/shared/variables/dev.yml"
   - local: "ci-templates/templates/shared/variables/computed.yml"
 
-deploy:staging:
-  extends:
-    - .k8s_job
+deploy:production:
+  extends: .k8s_job
   stage: deploy-production
   variables:
-    TARGET_NAMESPACE: "$ENVIRONMENT_STAGING"
+    TARGET_NAMESPACE: "production"
     OVERLAY_DIR: "k8s/overlays/production"
     KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
   before_script:
-    - !reference [.k8s_job, before_script]  # ✅ Inherit base setup.
+    - !reference [.k8s_job, before_script]
     - mkdir -p "$(dirname "$KUBECONFIG")"
     - |
       cat > "${KUBECONFIG}" <<EOF
       apiVersion: v1
       clusters:
       - cluster:
-          server: ${K3S_SERVER}
-          certificate-authority-data: ${K3S_CA_CERT}
-        name: k3s
+          server: ${K3D_REMOTE_SERVER}
+          insecure-skip-tls-verify: true
+        name: k3d-remote
       contexts:
       - context:
-          cluster: k3s
-          user: k3s-user
-          namespace: ${TARGET_NAMESPACE}  # Changed from ENVIRONMENT_PRODUCTION
-        name: k3s
-      current-context: k3s
+          cluster: k3d-remote
+          user: gitlab-ci
+          namespace: ${TARGET_NAMESPACE}
+        name: k3d-remote
+      current-context: k3d-remote
       kind: Config
       users:
-      - name: k3s-user
+      - name: gitlab-ci
         user:
-          client-certificate-data: ${K3S_CLIENT_CERT}
-          client-key-data: ${K3S_CLIENT_KEY}
+          token: ${K3D_REMOTE_TOKEN}
       EOF
     - kubectl cluster-info
-    # DEBUG: Check what variables are available
-    - echo "IMAGE_VERSIONED = ${IMAGE_VERSIONED}"
-    - echo "CI_COMMIT_SHORT_SHA = ${CI_COMMIT_SHORT_SHA}"
-    - env | grep -E "(IMAGE|CI_COMMIT|TAG)"
   script:
     - !reference [.k8s_prepare_script, script]
-    - !reference [.k8s_gitops_script, script]
+    - !reference [.k8s_apply_overlay_script, script]
+
  
