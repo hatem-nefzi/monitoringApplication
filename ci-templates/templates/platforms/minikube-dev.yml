@@ -12,7 +12,7 @@ deploy:dev:
     # Setup SSH
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
-    - cp "$SSH_PRIVATE_KEY_LOCAL" ~/.ssh/id_rsa
+    - echo "$SSH_PRIVATE_KEY_LOCAL" | base64 -d > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan -H $LOCAL_MACHINE_IP >> ~/.ssh/known_hosts 2>/dev/null
     # Create SSH tunnel (maps remote port 6443 to local k3d port 39165)
