@@ -1,0 +1,6 @@
+.git
+.gitignore
+*.md
+.gitlab-ci.yml
+target/
+.m2/
