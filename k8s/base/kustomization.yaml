@@ -11,6 +11,9 @@ resources:
   - rbac/cluster-role.yaml
   - rbac/cluster-role-binding.yaml
   - redis.yaml
+  - observability-namespace.yaml
+  - jaeger.yaml
+  - otel-collector.yaml
 
 # Remove commonLabels to prevent Redis from getting backend labels
 # Each deployment should have its own specific labels

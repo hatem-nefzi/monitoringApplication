@@ -18,6 +18,7 @@ spec:
             memory: "384Mi"
             cpu: "200m"
         env:
+        # Staging-specific environment variables
         - name: SPRING_PROFILES_ACTIVE
           value: "staging"
         - name: SERVER_PORT
@@ -36,3 +37,16 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        # Preserve existing Redis and OTEL env vars from base
+        - name: REDIS_HOST
+          value: "redis-service"
+        - name: REDIS_PORT  
+          value: "6379"
+        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+          value: "http://otel-collector.observability.svc.cluster.local:4318/v1/traces"
+        - name: OTEL_SERVICE_NAME
+          value: "monitoring-backend"
+        - name: OTEL_TRACES_EXPORTER
+          value: "otlp"
+        - name: OTEL_METRICS_EXPORTER
+          value: "none"

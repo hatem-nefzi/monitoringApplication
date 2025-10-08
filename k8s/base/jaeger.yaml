@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: observability
+  labels:
+    app: jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: jaeger
+    spec:
+      containers:
+      - env:
+        - name: COLLECTOR_OTLP_ENABLED
+          value: "true"
+        - name: COLLECTOR_ZIPKIN_HOST_PORT
+          value: :9411
+        image: jaegertracing/all-in-one:1.51
+        imagePullPolicy: IfNotPresent
+        name: jaeger
+        ports:
+        - containerPort: 16686
+          name: ui
+          protocol: TCP
+        - containerPort: 14268
+          name: collector-http
+          protocol: TCP
+        - containerPort: 14250
+          name: collector-grpc
+          protocol: TCP
+        - containerPort: 6831
+          name: agent-compact
+          protocol: TCP
+        - containerPort: 6832
+          name: agent-binary
+          protocol: TCP
+        resources: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-service
+  namespace: observability
+  labels:
+    app: jaeger
+spec:
+  ports:
+  - name: ui
+    port: 16686
+    protocol: TCP
+    targetPort: 16686
+  - name: collector-http
+    port: 14268
+    protocol: TCP
+    targetPort: 14268
+  - name: collector-grpc
+    port: 14250
+    protocol: TCP
+    targetPort: 14250
+  - name: agent-compact
+    port: 6831
+    protocol: UDP
+    targetPort: 6831
+  - name: agent-binary
+    port: 6832
+    protocol: UDP
+    targetPort: 6832
+  - name: zipkin
+    port: 9411
+    protocol: TCP
+    targetPort: 9411
+  selector:
+    app: jaeger
+  type: ClusterIP
