@@ -2,10 +2,8 @@
 FROM eclipse-temurin:17-jdk-alpine AS builder
 WORKDIR /app
 
-# Install Maven
-RUN apt-get update && \
-    apt-get install -y maven && \
-    rm -rf /var/lib/apt/lists/*
+# Install Maven (Alpine uses apk)
+RUN apk add --no-cache maven
 
 COPY . .
 RUN ./mvnw clean package -DskipTests && rm -rf ~/.m2
