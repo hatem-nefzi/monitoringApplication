@@ -3,14 +3,16 @@ include:
   - local: "ci-templates/templates/shared/variables/dev.yml"
   - local: "ci-templates/templates/shared/variables/computed.yml"
 
-deploy:production:
-  extends: .k8s_job
+deploy:staging:
+  extends:
+    - .k8s_job
   stage: deploy-production
   variables:
-    TARGET_NAMESPACE: "production"
+    TARGET_NAMESPACE: "$ENVIRONMENT_STAGING"
     OVERLAY_DIR: "k8s/overlays/production"
     KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
   before_script:
+
     - !reference [.k8s_job, before_script]
     - mkdir -p "$(dirname "$KUBECONFIG")"
     - |
