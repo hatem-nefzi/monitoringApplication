@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM eclipse-temurin:17-jdk AS builder
+FROM eclipse-temurin:17-jdk-alpine AS builder
 WORKDIR /app
 
 # Install Maven
@@ -11,7 +11,7 @@ COPY . .
 RUN ./mvnw clean package -DskipTests && rm -rf ~/.m2
 
 # Stage 2: Run
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
 # Download OpenTelemetry Java agent
