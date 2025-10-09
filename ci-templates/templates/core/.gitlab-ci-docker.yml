@@ -22,7 +22,7 @@ include:
 
   script:
     - echo "=== BUILDING DOCKER IMAGE ==="
-    - docker build -t "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}" -t "$CI_REGISTRY_IMAGE:latest" .
+    - docker build -t "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"  .
 
     - echo "=== LOGGING INTO GITLAB CONTAINER REGISTRY ==="
     - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
@@ -30,8 +30,7 @@ include:
     - echo "=== PUSHING IMAGES ==="
     - echo "Pushing versioned tag $CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
     - docker push "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
-    - echo "Pushing latest tag $CI_REGISTRY_IMAGE:latest"
-    - docker push "$CI_REGISTRY_IMAGE:latest"
+    
     # ✅ Capture the digest of the pushed image
     - IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}")
     - echo "IMAGE_DIGEST=$IMAGE_DIGEST" >> build.env
