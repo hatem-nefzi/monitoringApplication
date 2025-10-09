@@ -20,7 +20,7 @@ COPY --from=builder /app/target/monitoring-app-0.0.1-SNAPSHOT.jar app.jar
 # Give permissions to non-root user
 RUN chown -R 1001:0 /app
 
-# Use UID directly so Kubernetes can verify non-root
+# Use UID directly so Kubernetes can verify non-root.
 USER 1001
 
 EXPOSE 9090
