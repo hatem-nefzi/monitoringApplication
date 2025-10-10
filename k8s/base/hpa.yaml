@@ -1,0 +1,31 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: monitoring-backend-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: monitoring-backend
+  minReplicas: 1  # ← Keep it low for laptop resources
+  maxReplicas: 3  # ← Small max to not kill your laptop
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60  # ← Fast scale down for testing
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 30
+    scaleUp:
+      stabilizationWindowSeconds: 0   # ← Immediate scale up
+      policies:
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50  # ← Lower threshold for easy testing
