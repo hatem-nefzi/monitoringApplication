@@ -207,5 +207,24 @@ public class KubernetesService {
             return info;
         }).collect(Collectors.toList());
     }
+    // Add this to your existing KubernetesService.java
+    public void deletePod(String namespace, String podName) throws ApiException {
+    try {
+        V1Pod result = coreV1Api.deleteNamespacedPod(
+            podName, 
+            namespace, 
+            null, // pretty
+            null, // dryRun
+            null, // gracePeriodSeconds
+            null, // orphanDependents
+            null, // propagationPolicy
+            null  // body
+        );
+        logger.info("✅ Successfully deleted pod: {}/{}", namespace, podName);
+    } catch (ApiException e) {
+        logger.error("❌ Failed to delete pod {}/{}: {}", namespace, podName, e.getResponseBody());
+        throw e;
+    }
+}
     
 }

@@ -11,7 +11,12 @@ import com.example.demo.model.PodInfo;
 
 import javax.annotation.PostConstruct;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+
+import com.example.demo.model.AutoRemediation.RemediationAction;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class CacheService {
@@ -171,4 +176,40 @@ public class CacheService {
         return null;
     }
 }
+    /**
+ * Store remediation action in Redis
+ * Key format: remediation:action:{id}
+ * Also maintains a sorted set for chronological retrieval
+ */
+public void storeRemediationAction(RemediationAction action) {
+    if (!isRedisHealthy()) {
+        logger.warn("Redis unavailable - cannot store remediation action");
+        return;
+    }
+
+    try {
+        String key = "remediation:action:" + action.getId();
+        ObjectMapper mapper = new ObjectMapper();
+        String jsonValue = mapper.writeValueAsString(action);
+
+        // Store the action
+        redisTemplate.opsForValue().set(key, jsonValue, Duration.ofDays(7)); // Keep for 7 days
+
+        // Add to sorted set for chronological queries
+        String sortedSetKey = "remediation:actions:timeline";
+        redisTemplate.opsForZSet().add(
+            sortedSetKey, 
+            action.getId(), 
+            System.currentTimeMillis()
+        );
+
+        logger.debug("Stored remediation action in Redis: {}", action.getId());
+    } catch (Exception e) {
+        logger.error("Failed to store remediation action in Redis", e);
+    }
+}
+    
+
+
+    
 }
