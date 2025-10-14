@@ -333,7 +333,7 @@ public class RemediationService {
             action,
             reason
         );
-        remediationAction.setTimestamp(LocalDateTime.now());
+        //remediationAction.setTimestamp(LocalDateTime.now());
         return remediationAction;
     }
 

@@ -15,7 +15,7 @@ public class RemediationAction {
     private String issue;                 // What was the problem? (e.g., "CrashLoopBackOff")
     private String action;                // What did we do? (e.g., "Pod Restart")
     private RemediationStatus status;     // Success/Failed/InProgress
-    private LocalDateTime timestamp;      // When did this happen
+    private String timestamp;      // When did this happen
     private String reason;                // Why did we take this action
     private Map<String, String> metadata; // Extra info (CPU usage, restart count, etc)
     private String error;                 // If it failed, why?
@@ -29,7 +29,7 @@ public class RemediationAction {
 
     // Constructors
     public RemediationAction() {
-        this.timestamp = LocalDateTime.now();
+        this.timestamp = LocalDateTime.now().toString();
         this.status = RemediationStatus.IN_PROGRESS;
     }
 
@@ -66,8 +66,8 @@ public class RemediationAction {
     public RemediationStatus getStatus() { return status; }
     public void setStatus(RemediationStatus status) { this.status = status; }
 
-    public LocalDateTime getTimestamp() { return timestamp; }
-    public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
+    public String getTimestamp() { return timestamp; }
+    public void setTimestamp(String timestamp) { this.timestamp = timestamp; }
 
     public String getReason() { return reason; }
     public void setReason(String reason) { this.reason = reason; }
