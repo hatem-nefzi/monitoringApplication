@@ -20,9 +20,11 @@ import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import io.kubernetes.client.custom.Quantity;
 
 @Service
 public class KubernetesService {
@@ -225,6 +227,60 @@ public class KubernetesService {
         logger.error("❌ Failed to delete pod {}/{}: {}", namespace, podName, e.getResponseBody());
         throw e;
     }
-}
+}   
+    /**
+     * Get resource requests and limits for a specific pod
+     */
+    public Map<String, String> getPodResourceRequests(String namespace, String podName) throws ApiException {
+        Map<String, String> resources = new HashMap<>();
+
+        try {
+            // Fetch the pod details
+            V1Pod pod = coreV1Api.readNamespacedPod(podName, namespace, null);
+
+            if (pod.getSpec() != null &&
+                pod.getSpec().getContainers() != null &&
+                !pod.getSpec().getContainers().isEmpty()) {
+
+                // Get the first container (or loop through all if needed)
+                V1Container container = pod.getSpec().getContainers().get(0);
+
+                if (container.getResources() != null) {
+                    // Get resource REQUESTS
+                    if (container.getResources().getRequests() != null) {
+                        Map<String, Quantity> requests = container.getResources().getRequests();
+
+                        if (requests.containsKey("cpu")) {
+                            resources.put("cpuRequest", requests.get("cpu").toSuffixedString());
+                        }
+                        if (requests.containsKey("memory")) {
+                            resources.put("memoryRequest", requests.get("memory").toSuffixedString());
+                        }
+                    }
+
+                    // Get resource LIMITS (optional, for future use)
+                    if (container.getResources().getLimits() != null) {
+                        Map<String, Quantity> limits = container.getResources().getLimits();
+
+                        if (limits.containsKey("cpu")) {
+                            resources.put("cpuLimit", limits.get("cpu").toSuffixedString());
+                        }
+                        if (limits.containsKey("memory")) {
+                            resources.put("memoryLimit", limits.get("memory").toSuffixedString());
+                        }
+                    }
+                }
+            }
+
+            logger.debug("Resource requests for pod {}/{}: {}", namespace, podName, resources);
+
+        } catch (ApiException e) {
+            logger.error("Failed to get resource requests for pod {}/{}: {}",
+                    namespace, podName, e.getMessage());
+            // Don't throw - just return empty map and let defaults be used
+        }
+
+        return resources;
+    }
     
 }
