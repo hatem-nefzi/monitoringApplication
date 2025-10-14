@@ -1,0 +1,10 @@
+# rbac/namespace-role.yaml - DELETE permissions for default namespace only
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role  # Namespace-scoped Role
+metadata:
+  name: monitoring-backend-remediator
+  namespace: default  # Only applies to default namespace
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["delete"]  # Only delete permission, scoped to default namespace

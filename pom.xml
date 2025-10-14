@@ -109,6 +109,11 @@
             <artifactId>opentelemetry-lettuce-5.1</artifactId>
             <version>2.10.0-alpha</version>
         </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>2.15.2</version>
+        </dependency>
 
     </dependencies>
 

@@ -14,6 +14,9 @@ resources:
   - observability-namespace.yaml
   - jaeger.yaml
   - otel-collector.yaml
+  #adding the rbac for remediator
+  - rbac/remediator-role/default-namespace-delete-role.yaml
+  - rbac/remediator-role/default-namespace-rolebinding.yaml
 
 # Remove commonLabels to prevent Redis from getting backend labels
 # Each deployment should have its own specific labels

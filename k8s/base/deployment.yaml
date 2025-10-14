@@ -33,7 +33,7 @@ spec:
           emptyDir: {}  # 🔒 Volume temporaire pour /tmp
       containers:
         - name: monitoring-backend
-          image: k3d-devcluster-registry:5000/monitoring-backend:1.0.22
+          image: k3d-devcluster-registry:5000/monitoring-backend:1.1.3
           imagePullPolicy: IfNotPresent # Pour le développement local, utiliser Always en prod
           ports:
             - containerPort: 9090
