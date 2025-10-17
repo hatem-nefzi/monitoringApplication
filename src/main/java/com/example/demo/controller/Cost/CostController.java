@@ -2,7 +2,11 @@ package com.example.demo.controller.Cost;
 
 import com.example.demo.model.Cost.*;
 import com.example.demo.service.Cost.CostAnalysisService;
+import com.example.demo.service.Cost.CostHistoryService;
+
 import io.kubernetes.client.openapi.ApiException;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +32,8 @@ public class CostController {
 
     @Autowired
     private CostAnalysisService costAnalysisService;
+    @Autowired
+    private CostHistoryService costHistoryService;
 
     /**
      * Get cost analysis for a specific namespace
@@ -164,4 +170,137 @@ public class CostController {
             )
         ));
     }
+    // Add these endpoints to your existing CostController.java
+
+/**
+ * Get cost history for a namespace
+ */
+@GetMapping("/history/{namespace}")
+public ResponseEntity<Map<String, Object>> getCostHistory(
+        @PathVariable String namespace,
+        @RequestParam(defaultValue = "30") int days) {
+    try {
+        logger.info("📈 Request: Cost history for namespace '{}' ({} days)", namespace, days);
+        
+        List<CostSnapshot> history = costHistoryService.getCostHistory(namespace, days);
+        
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "namespace", namespace,
+            "days", days,
+            "history", history,
+            "dataPoints", history.size()
+        ));
+    } catch (Exception e) {
+        logger.error("Error fetching cost history for {}: {}", namespace, e.getMessage(), e);
+        return ResponseEntity.status(500)
+            .body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+    }
+}
+
+/**
+ * Get savings calculation for a namespace
+ */
+@GetMapping("/savings/{namespace}")
+public ResponseEntity<Map<String, Object>> getSavings(@PathVariable String namespace) {
+    try {
+        logger.info("💰 Request: Savings calculation for namespace '{}'", namespace);
+        
+        Map<String, Object> savings = costHistoryService.calculateSavings(namespace);
+        
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "namespace", namespace,
+            "savings", savings
+        ));
+    } catch (Exception e) {
+        logger.error("Error calculating savings for {}: {}", namespace, e.getMessage(), e);
+        return ResponseEntity.status(500)
+            .body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+    }
+}
+
+/**
+ * Get cost trend analysis
+ */
+@GetMapping("/trend/{namespace}")
+public ResponseEntity<Map<String, Object>> getCostTrend(
+        @PathVariable String namespace,
+        @RequestParam(defaultValue = "30") int days) {
+    try {
+        logger.info("📊 Request: Cost trend for namespace '{}' ({} days)", namespace, days);
+        
+        Map<String, Object> trend = costHistoryService.analyzeTrend(namespace, days);
+        
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "namespace", namespace,
+            "trend", trend
+        ));
+    } catch (Exception e) {
+        logger.error("Error analyzing trend for {}: {}", namespace, e.getMessage(), e);
+        return ResponseEntity.status(500)
+            .body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+    }
+}
+
+/**
+ * Manually trigger a cost snapshot
+ */
+@PostMapping("/snapshot/{namespace}")
+public ResponseEntity<Map<String, Object>> createSnapshot(@PathVariable String namespace) {
+    try {
+        logger.info("📸 Request: Manual snapshot for namespace '{}'", namespace);
+        
+        CostSnapshot snapshot = costHistoryService.manualSnapshot(namespace);
+        
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "message", "Snapshot created successfully",
+            "snapshot", snapshot
+        ));
+    } catch (Exception e) {
+        logger.error("Error creating snapshot for {}: {}", namespace, e.getMessage(), e);
+        return ResponseEntity.status(500)
+            .body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+    }
+}
+
+/**
+ * Get cluster-wide cost history
+ */
+@GetMapping("/history/cluster")
+public ResponseEntity<Map<String, Object>> getClusterCostHistory(
+        @RequestParam(defaultValue = "30") int days) {
+    try {
+        logger.info("📈 Request: Cluster-wide cost history ({} days)", days);
+        
+        Map<String, Object> history = costHistoryService.getClusterCostHistory(days);
+        
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "days", days,
+            "history", history
+        ));
+    } catch (Exception e) {
+        logger.error("Error fetching cluster cost history: {}", e.getMessage(), e);
+        return ResponseEntity.status(500)
+            .body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+    }
+}
 }
