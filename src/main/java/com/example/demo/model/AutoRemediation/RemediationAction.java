@@ -1,5 +1,6 @@
 package com.example.demo.model.AutoRemediation;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -15,7 +16,7 @@ public class RemediationAction {
     private String issue;                 // What was the problem? (e.g., "CrashLoopBackOff")
     private String action;                // What did we do? (e.g., "Pod Restart")
     private RemediationStatus status;     // Success/Failed/InProgress
-    private String timestamp;      // When did this happen
+    private Instant timestamp;      // When did this happen
     private String reason;                // Why did we take this action
     private Map<String, String> metadata; // Extra info (CPU usage, restart count, etc)
     private String error;                 // If it failed, why?
@@ -29,7 +30,7 @@ public class RemediationAction {
 
     // Constructors
     public RemediationAction() {
-        this.timestamp = LocalDateTime.now().toString();
+        this.timestamp = Instant.now();
         this.status = RemediationStatus.IN_PROGRESS;
     }
 
@@ -66,8 +67,8 @@ public class RemediationAction {
     public RemediationStatus getStatus() { return status; }
     public void setStatus(RemediationStatus status) { this.status = status; }
 
-    public String getTimestamp() { return timestamp; }
-    public void setTimestamp(String timestamp) { this.timestamp = timestamp; }
+    public Instant getTimestamp() { return timestamp; }
+    public void setTimestamp(Instant timestamp) { this.timestamp = timestamp; }
 
     public String getReason() { return reason; }
     public void setReason(String reason) { this.reason = reason; }
