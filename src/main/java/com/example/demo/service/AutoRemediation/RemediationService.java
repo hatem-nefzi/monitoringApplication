@@ -12,6 +12,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import com.example.demo.service.KubernetesService;
 import com.example.demo.service.CacheService;
+
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -19,13 +21,18 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * 🧠 AUTO-REMEDIATION ENGINE
+ * 🧠 AUTO-REMEDIATION ENGINE (Thread-Safe Version)
  * 
  * This service continuously monitors your cluster and automatically fixes common issues:
  * - Restarts crashing pods
  * - Cleans up failed pods
  * - Detects resource issues
  * - Logs all actions for audit
+ * 
+ * IMPROVEMENTS:
+ * ✅ Thread-safe list operations (fixed race conditions)
+ * ✅ Synchronized policy access
+ * ✅ Atomic stat calculations
  */
 @Service
 public class RemediationService {
@@ -42,10 +49,11 @@ public class RemediationService {
     private final Map<String, LocalDateTime> lastActionTime = new ConcurrentHashMap<>();
     
     // History of all actions (stored in Redis via CacheService)
+    // Using synchronized list for thread-safe iteration
     private final List<RemediationAction> recentActions = Collections.synchronizedList(new ArrayList<>());
 
-    // Configuration
-    private RemediationPolicy policy = new RemediationPolicy();
+    // Configuration (use volatile to ensure visibility across threads)
+    private volatile RemediationPolicy policy = new RemediationPolicy();
 
     /**
      * 🔄 MAIN MONITORING LOOP
@@ -53,7 +61,10 @@ public class RemediationService {
      */
     @Scheduled(fixedDelay = 30000, initialDelay = 10000)
     public void monitorAndRemediate() {
-        if (!policy.isEnabled()) {
+        // Read policy once at start of method (more efficient than multiple accesses)
+        RemediationPolicy currentPolicy = this.policy;
+        
+        if (!currentPolicy.isEnabled()) {
             logger.debug("Auto-remediation is disabled");
             return;
         }
@@ -63,7 +74,6 @@ public class RemediationService {
         try {
             List<PodInfo> allPods = kubernetesService.getPodInfoClusterWide();
             
-            // DEBUG: Detailed logging for troubleshooting
             logger.info("📊 Scanning {} pods for issues", allPods.size());
             
             // Log details about pods with potential issues
@@ -72,7 +82,7 @@ public class RemediationService {
                 boolean allReady = areAllContainersReady(pod);
                 boolean hasWaiting = hasWaitingContainers(pod);
                 
-                if (restarts >= 2) { // Log any pod with 2+ restarts for debugging
+                if (restarts >= 2) {
                     logger.info("📝 Pod {}/{}: restarts={}, allReady={}, hasWaiting={}, containers={}", 
                         pod.getNamespace(), pod.getName(), restarts, allReady, hasWaiting,
                         pod.getContainers().stream()
@@ -92,7 +102,7 @@ public class RemediationService {
                     continue;
                 }
 
-                // 1. Check for CrashLoopBackOff (FIXED LOGIC)
+                // 1. Check for CrashLoopBackOff
                 if (isCrashLoopBackOff(pod)) {
                     logger.info("🎯 CRASH LOOP DETECTED: {}/{} with {} restarts", 
                         pod.getNamespace(), pod.getName(), getTotalRestartCount(pod));
@@ -100,7 +110,7 @@ public class RemediationService {
                     if (shouldRemediate(podKey, "CrashLoopBackOff")) {
                         logger.info("🔄 TAKING ACTION: Deleting pod {}/{}", 
                             pod.getNamespace(), pod.getName());
-                        handleCrashLoopBackOff(pod);
+                        handleCrashLoopBackOff(pod, currentPolicy);
                         actionsTaken++;
                     }
                 }
@@ -113,12 +123,12 @@ public class RemediationService {
                     handleHighRestartCount(pod);
                 }
 
-                // 3. Check for Failed pods (old)
+                // 3. Check for Failed pods
                 else if ("Failed".equals(pod.getStatus())) {
                     logger.info("⚠️ FAILED POD: {}/{}", pod.getNamespace(), pod.getName());
                     issuesFound++;
                     if (shouldRemediate(podKey, "Failed")) {
-                        handleFailedPod(pod);
+                        handleFailedPod(pod, currentPolicy);
                         actionsTaken++;
                     }
                 }
@@ -143,13 +153,13 @@ public class RemediationService {
     /**
      * 🔄 Handle CrashLoopBackOff: Delete pod to force recreation
      */
-    private void handleCrashLoopBackOff(PodInfo pod) {
+    private void handleCrashLoopBackOff(PodInfo pod, RemediationPolicy currentPolicy) {
         String podKey = getPodKey(pod);
         int attempts = restartAttempts.getOrDefault(podKey, 0);
 
-        if (attempts >= policy.getMaxRestartAttempts()) {
+        if (attempts >= currentPolicy.getMaxRestartAttempts()) {
             logger.warn("⚠️ Pod {} exceeded max restart attempts ({}). Manual intervention needed.", 
-                podKey, policy.getMaxRestartAttempts());
+                podKey, currentPolicy.getMaxRestartAttempts());
             
             RemediationAction action = createAction(pod, "CrashLoopBackOff", "SKIPPED", 
                 "Exceeded max restart attempts");
@@ -171,13 +181,13 @@ public class RemediationService {
             action.setStatus(RemediationAction.RemediationStatus.SUCCESS);
             action.setMetadata(Map.of(
                 "restartAttempt", String.valueOf(attempts + 1),
-                "maxAttempts", String.valueOf(policy.getMaxRestartAttempts()),
+                "maxAttempts", String.valueOf(currentPolicy.getMaxRestartAttempts()),
                 "containerRestarts", String.valueOf(getMaxRestartCount(pod)),
                 "totalRestarts", String.valueOf(getTotalRestartCount(pod))
             ));
 
             logger.info("✅ Deleted pod {} to fix crash loop (attempt {}/{})", 
-                podKey, attempts + 1, policy.getMaxRestartAttempts());
+                podKey, attempts + 1, currentPolicy.getMaxRestartAttempts());
 
         } catch (ApiException e) {
             action.setStatus(RemediationAction.RemediationStatus.FAILED);
@@ -191,10 +201,10 @@ public class RemediationService {
     /**
      * 🗑️ Handle Failed pods: Clean up old failed pods
      */
-    private void handleFailedPod(PodInfo pod) {
-        if (!policy.isAutoDeleteFailedPods()) {
+    private void handleFailedPod(PodInfo pod, RemediationPolicy currentPolicy) {
+        if (!currentPolicy.isAutoDeleteFailedPods()) {
             logger.info("⏸️ Auto-delete for failed pods is disabled");
-            return; // Feature disabled
+            return;
         }
 
         RemediationAction action = createAction(pod, "Failed", "Delete Failed Pod", 
@@ -242,10 +252,10 @@ public class RemediationService {
         recordAction(action);
     }
 
-    // ==================== DETECTION HELPERS (FIXED) ====================
+    // ==================== DETECTION HELPERS ====================
 
     /**
-     * FIXED: A pod is in crash loop if it has high restart count AND is not running properly
+     * A pod is in crash loop if it has high restart count AND is not running properly
      */
     private boolean isCrashLoopBackOff(PodInfo pod) {
         if (pod.getContainers() == null || pod.getContainers().isEmpty()) {
@@ -256,7 +266,6 @@ public class RemediationService {
         boolean allContainersReady = areAllContainersReady(pod);
         boolean hasWaitingContainers = hasWaitingContainers(pod);
         
-        // Pod is in crash loop if it has high restarts AND (not all ready OR has waiting containers)
         boolean isCrashLoop = hasHighRestarts && (!allContainersReady || hasWaitingContainers);
         
         if (isCrashLoop) {
@@ -297,15 +306,9 @@ public class RemediationService {
             .orElse(0);
     }
 
-    private boolean isOldEnough(PodInfo pod, int minutes) {
-        // For now, we'll act on any pod in bad state regardless of age
-        return true;
-    }
-
     // ==================== UTILITY METHODS ====================
 
     private boolean shouldRemediate(String podKey, String issue) {
-        // Check if we've acted on this pod recently (backoff)
         LocalDateTime lastAction = lastActionTime.get(podKey);
         if (lastAction != null && ChronoUnit.MINUTES.between(lastAction, LocalDateTime.now()) < 2) {
             logger.debug("Skipping {} - acted recently", podKey);
@@ -318,7 +321,6 @@ public class RemediationService {
         return namespace.startsWith("kube-") || 
                "cattle-system".equals(namespace) ||
                "ingress-nginx".equals(namespace);
-        // NOTE: "default" namespace is NOT excluded anymore so we can test there
     }
 
     private String getPodKey(PodInfo pod) {
@@ -333,19 +335,27 @@ public class RemediationService {
             action,
             reason
         );
-        //remediationAction.setTimestamp(LocalDateTime.now());
+        remediationAction.setTimestamp(Instant.now());
         return remediationAction;
     }
 
+    /**
+     * ✅ FIXED: Thread-safe action recording
+     * - Synchronized block to prevent race conditions
+     * - Atomic size check and removal
+     * - Proper exception handling
+     */
     private void recordAction(RemediationAction action) {
-        recentActions.add(action);
-        
-        // Keep only last 100 actions in memory
-        if (recentActions.size() > 100) {
-            recentActions.remove(0);
+        synchronized(recentActions) {
+            recentActions.add(action);
+            
+            // Keep only last 100 actions in memory (atomic with add)
+            if (recentActions.size() > 100) {
+                recentActions.remove(0);
+            }
         }
 
-        // Store in Redis for persistence
+        // Store in Redis for persistence (outside lock, won't block monitoring loop)
         try {
             cacheService.storeRemediationAction(action);
         } catch (Exception e) {
@@ -357,37 +367,58 @@ public class RemediationService {
 
     // ==================== PUBLIC API ====================
 
+    /**
+     * ✅ FIXED: Thread-safe list retrieval
+     * - Synchronized block prevents race conditions during iteration
+     * - Creates defensive copy (subList + ArrayList)
+     */
     public List<RemediationAction> getRecentActions(int limit) {
-        int size = recentActions.size();
-        int fromIndex = Math.max(0, size - limit);
-        return new ArrayList<>(recentActions.subList(fromIndex, size));
+        synchronized(recentActions) {
+            int size = recentActions.size();
+            int fromIndex = Math.max(0, size - limit);
+            // Create defensive copy inside synchronized block
+            return new ArrayList<>(recentActions.subList(fromIndex, size));
+        }
     }
 
+    /**
+     * Get policy (thread-safe read with volatile)
+     */
     public RemediationPolicy getPolicy() {
-        return policy;
+        return this.policy;
     }
 
-    public void updatePolicy(RemediationPolicy newPolicy) {
+    /**
+     * Update policy (thread-safe write with volatile)
+     */
+    public synchronized void updatePolicy(RemediationPolicy newPolicy) {
         this.policy = newPolicy;
         logger.info("📋 Policy updated: {}", newPolicy);
     }
 
+    /**
+     * ✅ FIXED: Thread-safe statistics calculation
+     * - Synchronized block for consistent snapshot
+     * - All counts calculated within lock
+     */
     public Map<String, Object> getStatistics() {
-        long successCount = recentActions.stream()
-            .filter(a -> a.getStatus() == RemediationAction.RemediationStatus.SUCCESS)
-            .count();
-        
-        long failedCount = recentActions.stream()
-            .filter(a -> a.getStatus() == RemediationAction.RemediationStatus.FAILED)
-            .count();
+        synchronized(recentActions) {
+            long successCount = recentActions.stream()
+                .filter(a -> a.getStatus() == RemediationAction.RemediationStatus.SUCCESS)
+                .count();
+            
+            long failedCount = recentActions.stream()
+                .filter(a -> a.getStatus() == RemediationAction.RemediationStatus.FAILED)
+                .count();
 
-        return Map.of(
-            "totalActions", recentActions.size(),
-            "successfulActions", successCount,
-            "failedActions", failedCount,
-            "policyEnabled", policy.isEnabled(),
-            "trackedPods", restartAttempts.size()
-        );
+            return Map.of(
+                "totalActions", recentActions.size(),
+                "successfulActions", successCount,
+                "failedActions", failedCount,
+                "policyEnabled", this.policy.isEnabled(),
+                "trackedPods", restartAttempts.size()
+            );
+        }
     }
 
     /**
