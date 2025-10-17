@@ -10,6 +10,8 @@ public class ContainerInfo {
     private int restartCount;
     private String state; // "Running", "Waiting", "Terminated", "Unknown"
       // ✅ ADD THIS
+    private String reason;
+    
     public ContainerInfo() {
     }
     public ContainerInfo(String name, String image, boolean ready, int restartCount, String state) {
@@ -18,5 +20,6 @@ public class ContainerInfo {
         this.ready = ready;
         this.restartCount = restartCount;
         this.state = state;
+        
     }
 }
