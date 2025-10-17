@@ -31,9 +31,11 @@ spec:
       volumes:
         - name: tmp-volume
           emptyDir: {}  # 🔒 Volume temporaire pour /tmp
+        - name: data-storage
+          emptyDir: {}  # Volume temporaire pour les données, si nécessaire
       containers:
         - name: monitoring-backend
-          image: k3d-devcluster-registry:5000/monitoring-backend:1.1.3
+          image: k3d-devcluster-registry:5000/monitoring-backend:1.1.4
           imagePullPolicy: IfNotPresent # Pour le développement local, utiliser Always en prod
           ports:
             - containerPort: 9090
@@ -66,3 +68,5 @@ spec:
           volumeMounts:
             - name: tmp-volume
               mountPath: /tmp  # 🔥 Permet à l'app d’écrire dans /tmp
+            - name: data-storage
+              mountPath: /app/data  # Monter le volume de données si nécessaire
