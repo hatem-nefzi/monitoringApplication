@@ -498,4 +498,10 @@ public ClusterCostSummary getClusterCostSummary() throws ApiException {
             return 0;
         }
     }
+    /**
+ * Get all namespaces (for scheduled snapshot)
+ */
+public List<String> getAllNamespaces() throws ApiException {
+    return kubernetesService.getNamespaces();
+}
 }
