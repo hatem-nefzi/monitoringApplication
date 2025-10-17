@@ -5,7 +5,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: monitoring-backend
-  namespace: PLACEHOLDER_NAMESPACE # WILL BE REPLACED
+  namespace: default # WILL BE REPLACED
 roleRef:
   kind: ClusterRole
   name: monitoring-backend-role
