@@ -2,6 +2,7 @@ package com.example.demo.model;
 
 import lombok.Data;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -15,6 +16,9 @@ public class PodInfo {
     private List<ContainerInfo> containers;
     private Map<String, String> metrics;  // New field
     // ✅ ADD THIS - Default constructor for Jackson
+    private String reason;  // Evicted, Terminating, etc
+    private LocalDateTime creationTimestamp;  // When was pod created
+
     public PodInfo() {
     }
 
@@ -28,4 +32,24 @@ public class PodInfo {
         this.containers = containers;
         this.metrics = metrics;
     }
+    public String getReason() {
+        return reason;
+    }
+
+    public void setReason(String reason) {
+        this.reason = reason;
+    }
+
+    public LocalDateTime getCreationTimestamp() {
+        return creationTimestamp;
+    }
+
+    public void setCreationTimestamp(LocalDateTime creationTimestamp) {
+        this.creationTimestamp = creationTimestamp;
+    }
+
+    public String getIdentifier() {
+        return namespace + "/" + name;
+    }
+    
 }

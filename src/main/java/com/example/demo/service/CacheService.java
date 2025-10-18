@@ -25,6 +25,8 @@ public class CacheService {
     
     @Autowired(required = false)
     private RedisTemplate<String, Object> redisTemplate;
+     @Autowired
+    private ObjectMapper objectMapper; // ← Inject instead of creating new
     
     private boolean redisAvailable = false;
     
@@ -182,34 +184,34 @@ public class CacheService {
  * Also maintains a sorted set for chronological retrieval
  */
 public void storeRemediationAction(RemediationAction action) {
-    if (!isRedisHealthy()) {
-        logger.warn("Redis unavailable - cannot store remediation action");
-        return;
-    }
+        if (!isRedisHealthy()) {
+            logger.warn("Redis unavailable - cannot store remediation action");
+            return;
+        }
 
-    try {
-        String key = "remediation:action:" + action.getId();
-        ObjectMapper mapper = new ObjectMapper();
-        String jsonValue = mapper.writeValueAsString(action);
+        try {
+            String key = "remediation:action:" + action.getId();
+            // Use the injected ObjectMapper instead of creating new one
+            String jsonValue = objectMapper.writeValueAsString(action); // ← Fixed!
 
-        // Store the action
-        redisTemplate.opsForValue().set(key, jsonValue, Duration.ofDays(7)); // Keep for 7 days
+            // Store the action
+            redisTemplate.opsForValue().set(key, jsonValue, Duration.ofDays(7));
 
-        // Add to sorted set for chronological queries
-        String sortedSetKey = "remediation:actions:timeline";
-        redisTemplate.opsForZSet().add(
-            sortedSetKey, 
-            action.getId(), 
-            System.currentTimeMillis()
-        );
+            // Add to sorted set for chronological queries
+            String sortedSetKey = "remediation:actions:timeline";
+            redisTemplate.opsForZSet().add(
+                sortedSetKey, 
+                action.getId(), 
+                System.currentTimeMillis()
+            );
 
-        logger.debug("Stored remediation action in Redis: {}", action.getId());
-    } catch (Exception e) {
-        logger.error("Failed to store remediation action in Redis", e);
+            logger.debug("Stored remediation action in Redis: {}", action.getId());
+        } catch (Exception e) {
+            logger.error("Failed to store remediation action in Redis", e);
+        }
     }
 }
     
 
 
-    
-}
+

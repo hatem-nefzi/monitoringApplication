@@ -19,6 +19,8 @@ import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -69,7 +71,7 @@ public class KubernetesService {
         logger.debug("Fetching pod info for all namespaces");
         try {
             V1PodList podList = coreV1Api.listPodForAllNamespaces(null, null, null, null, null, null, null, null, null, null);
-            return podList.getItems().stream().map(this::mapPodToPodInfo).collect(Collectors.toList());
+            return podList.getItems().stream().map(this::convertV1PodToPodInfo).collect(Collectors.toList());
         } catch (ApiException e) {
             logger.error("Failed to fetch pods for all namespaces: {}", e.getResponseBody(), e);
             throw e;
@@ -282,5 +284,111 @@ public class KubernetesService {
 
         return resources;
     }
+
+    /**
+     * Get single pod info with reason, timestamp, container reasons
+     */
+    public PodInfo getPodInfo(String namespace, String podName) throws ApiException {
+        try {
+            V1Pod v1Pod = coreV1Api.readNamespacedPod(podName, namespace, null);
+            return convertV1PodToPodInfo(v1Pod);
+        } catch (ApiException e) {
+            logger.error("Error fetching pod {}/{}: {}", namespace, podName, e.getMessage());
+            throw e;
+        }
+    }
+
+    /**
+     * Check if pod exists
+     */
+    public boolean podExists(String namespace, String podName) throws ApiException {
+        try {
+            V1Pod pod = coreV1Api.readNamespacedPod(podName, namespace, null);
+            return pod != null;
+        } catch (ApiException e) {
+            if (e.getCode() == 404) return false;
+            throw e;
+        }
+    }
+
+    /**
+     * Convert Kubernetes V1Pod to our PodInfo (extracts reason, timestamp, container reasons)
+     */
+    private PodInfo convertV1PodToPodInfo(V1Pod v1Pod) {
+    if (v1Pod == null || v1Pod.getMetadata() == null) return null;
+
+    V1ObjectMeta metadata = v1Pod.getMetadata();
+    V1PodStatus status = v1Pod.getStatus();
+    V1PodSpec spec = v1Pod.getSpec();
+
+    // Get container specs for image extraction
+    Map<String, V1Container> containerSpecs = spec.getContainers().stream()
+            .collect(Collectors.toMap(V1Container::getName, container -> container));
+
+    // Extract containers with reasons
+    List<ContainerInfo> containers = new ArrayList<>();
+    if (status != null && status.getContainerStatuses() != null) {
+        for (V1ContainerStatus containerStatus : status.getContainerStatuses()) {
+            ContainerInfo containerInfo = new ContainerInfo();
+            containerInfo.setName(containerStatus.getName());
+            containerInfo.setReady(containerStatus.getReady() != null && containerStatus.getReady());
+            containerInfo.setRestartCount(containerStatus.getRestartCount() != null ? containerStatus.getRestartCount() : 0);
+
+            // Get image from spec
+            V1Container containerSpec = containerSpecs.get(containerStatus.getName());
+            if (containerSpec != null) {
+                containerInfo.setImage(containerSpec.getImage());
+            }
+
+            // Extract container reason (OOMKilled, ImagePullBackOff, etc)
+            if (containerStatus.getState() != null) {
+                V1ContainerState state = containerStatus.getState();
+                if (state.getRunning() != null) {
+                    containerInfo.setState("Running");
+                    containerInfo.setReason("Started");
+                } else if (state.getWaiting() != null) {
+                    containerInfo.setState("Waiting");
+                    containerInfo.setReason(state.getWaiting().getReason());
+                } else if (state.getTerminated() != null) {
+                    containerInfo.setState("Terminated");
+                    containerInfo.setReason(state.getTerminated().getReason());
+                }
+            }
+            containers.add(containerInfo);
+        }
+    }
+
+    // Get metrics
+    Map<String, String> metrics = metricsService.getPodMetrics(
+            metadata.getNamespace(),
+            metadata.getName()
+    );
+
+    // Set creation timestamp for age checking
+    LocalDateTime createdTime = LocalDateTime.now();
+    if (metadata.getCreationTimestamp() != null) {
+        createdTime = LocalDateTime.ofInstant(
+                metadata.getCreationTimestamp().toInstant(),
+                ZoneId.systemDefault()
+        );
+    }
+
+    // Create and return PodInfo with all fields
+    PodInfo podInfo = new PodInfo(
+            metadata.getName(),
+            metadata.getNamespace(),
+            status != null ? status.getPhase() : "Unknown",
+            spec.getNodeName(),
+            status != null ? status.getHostIP() : "Unknown",
+            containers,
+            metrics
+    );
+    
+    // Set the new fields
+    podInfo.setReason(status != null ? status.getReason() : null);
+    podInfo.setCreationTimestamp(createdTime);
+    
+    return podInfo;
+}
     
 }

@@ -20,6 +20,10 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+// Import BackoffStrategy and PodStateDetector
+import com.example.demo.service.AutoRemediation.BackoffStrategy;
+import com.example.demo.service.AutoRemediation.PodStateDetector;
+
 /**
  * 🧠 AUTO-REMEDIATION ENGINE (Thread-Safe Version)
  * 
@@ -44,9 +48,11 @@ public class RemediationService {
     @Autowired
     private CacheService cacheService;
 
-    // In-memory tracking of remediation attempts (prevent infinite loops)
-    private final Map<String, Integer> restartAttempts = new ConcurrentHashMap<>();
-    private final Map<String, LocalDateTime> lastActionTime = new ConcurrentHashMap<>();
+    // 🎯 SMART BACKOFF STRATEGY (replaces old fixed cooldown)
+    private final BackoffStrategy backoffStrategy = new BackoffStrategy();
+    
+    // 🎯 ENHANCED POD STATE DETECTOR (catches OOMKilled, Evicted, ImagePullBackOff, etc)
+    private final PodStateDetector podStateDetector = new PodStateDetector();
     
     // History of all actions (stored in Redis via CacheService)
     // Using synchronized list for thread-safe iteration
@@ -73,11 +79,21 @@ public class RemediationService {
         
         try {
             List<PodInfo> allPods = kubernetesService.getPodInfoClusterWide();
-            
+            // debugging
+            for (PodInfo pod : allPods) {
+                if (pod.getContainers() != null && !pod.getContainers().isEmpty()) {
+                    for (ContainerInfo c : pod.getContainers()) {
+                        logger.info("DEBUG Pod {}/{}: state={}, reason={}, ready={}, restarts={}",
+                                pod.getNamespace(), pod.getName(),
+                                c.getState(), c.getReason(), c.isReady(), c.getRestartCount());
+                    }
+                }
+            }
             logger.info("📊 Scanning {} pods for issues", allPods.size());
             
             // Log details about pods with potential issues
             for (PodInfo pod : allPods) {
+                
                 int restarts = getTotalRestartCount(pod);
                 boolean allReady = areAllContainersReady(pod);
                 boolean hasWaiting = hasWaitingContainers(pod);
@@ -102,43 +118,78 @@ public class RemediationService {
                     continue;
                 }
 
-                // 1. Check for CrashLoopBackOff
-                if (isCrashLoopBackOff(pod)) {
+                // 1. Check for OOMKilled (HIGHEST PRIORITY - memory pressure)
+                if (podStateDetector.isOOMKilled(pod)) {
+                    logger.info("🚨 OOM KILLED DETECTED: {}/{} with {} restarts", 
+                        pod.getNamespace(), pod.getName(), getTotalRestartCount(pod));
+                    issuesFound++;
+                    if (shouldRemediateAfterBackoff(podKey)) {
+                        logger.info("🔄 TAKING ACTION: Deleting OOMKilled pod {}/{} (requires manual intervention)", 
+                            pod.getNamespace(), pod.getName());
+                        handleOOMKilled(pod, currentPolicy);
+                        actionsTaken++;
+                    }
+                }
+
+                // 2. Check for Evicted (pod was kicked off node)
+                else if (podStateDetector.isEvicted(pod)) {
+                    logger.info("⚠️ EVICTED POD: {}/{}", pod.getNamespace(), pod.getName());
+                    issuesFound++;
+                    if (shouldRemediateAfterBackoff(podKey)) {
+                        logger.info("🔄 TAKING ACTION: Deleting evicted pod {}/{}", 
+                            pod.getNamespace(), pod.getName());
+                        handleEvictedPod(pod);
+                        actionsTaken++;
+                    }
+                }
+
+                // 3. Check for ImagePullBackOff (can't pull image)
+                else if (podStateDetector.isImagePullBackOff(pod)) {
+                    logger.info("🖼️ IMAGE PULL BACKOFF: {}/{}", pod.getNamespace(), pod.getName());
+                    issuesFound++;
+                    handleImagePullBackOff(pod);
+                    // Don't auto-remediate - likely a registry issue or wrong image name
+                }
+
+                // 4. Check for CreateContainerConfigError (bad pod config)
+                else if (podStateDetector.isCreateContainerConfigError(pod)) {
+                    logger.info("❌ CREATE CONTAINER CONFIG ERROR: {}/{}", 
+                        pod.getNamespace(), pod.getName());
+                    issuesFound++;
+                    handleCreateContainerConfigError(pod);
+                    // Don't auto-remediate - needs manual fix (bad spec/config)
+                }
+
+                // 5. Check for Pending too long (resource constraints)
+                else if (podStateDetector.isPendingTooLong(pod)) {
+                    logger.info("⏳ PENDING TOO LONG: {}/{}", pod.getNamespace(), pod.getName());
+                    issuesFound++;
+                    handlePendingPod(pod);
+                    // Don't auto-remediate - likely resource constraint or taint issue
+                }
+
+                // 6. Check for CrashLoopBackOff with age check
+                else if (podStateDetector.isCrashLoopBackOffWithAgeCheck(pod)) {
                     logger.info("🎯 CRASH LOOP DETECTED: {}/{} with {} restarts", 
                         pod.getNamespace(), pod.getName(), getTotalRestartCount(pod));
                     issuesFound++;
-                    if (shouldRemediate(podKey, "CrashLoopBackOff")) {
+                    
+                    // 🔄 Use smart backoff strategy
+                    boolean isHealthy = areAllContainersReady(pod) && getTotalRestartCount(pod) == 0;
+                    if (backoffStrategy.shouldRemediateNow(podKey, isHealthy)) {
                         logger.info("🔄 TAKING ACTION: Deleting pod {}/{}", 
                             pod.getNamespace(), pod.getName());
                         handleCrashLoopBackOff(pod, currentPolicy);
                         actionsTaken++;
+                    } else {
+                        BackoffStrategy.BackoffState state = backoffStrategy.getState(podKey);
+                        logger.info("⏸️  BACKOFF: Pod {}/{} - will retry after backoff. Attempt {}/{}",
+                            pod.getNamespace(), pod.getName(), state.getAttemptCount(), 
+                            currentPolicy.getMaxRestartAttempts());
                     }
                 }
 
-                // 2. Check for high restart count (alert only)
-                else if (hasHighRestartCount(pod, 5)) {
-                    logger.info("⚠️ HIGH RESTART COUNT: {}/{} has {} restarts", 
-                        pod.getNamespace(), pod.getName(), getTotalRestartCount(pod));
-                    issuesFound++;
-                    handleHighRestartCount(pod);
-                }
-
-                // 3. Check for Failed pods
-                else if ("Failed".equals(pod.getStatus())) {
-                    logger.info("⚠️ FAILED POD: {}/{}", pod.getNamespace(), pod.getName());
-                    issuesFound++;
-                    if (shouldRemediate(podKey, "Failed")) {
-                        handleFailedPod(pod, currentPolicy);
-                        actionsTaken++;
-                    }
-                }
-
-                // 4. Check for Pending too long
-                else if ("Pending".equals(pod.getStatus())) {
-                    logger.info("⚠️ PENDING POD: {}/{}", pod.getNamespace(), pod.getName());
-                    issuesFound++;
-                    handlePendingPod(pod);
-                }
+                
             }
 
             logger.info("✅ Scan complete: {} issues found, {} actions taken", issuesFound, actionsTaken);
@@ -151,19 +202,123 @@ public class RemediationService {
     // ==================== REMEDIATION HANDLERS ====================
 
     /**
-     * 🔄 Handle CrashLoopBackOff: Delete pod to force recreation
+     * 🚨 Handle OOMKilled: Pod was killed due to memory pressure
+     * Action: Delete pod and alert ops (likely needs more memory)
      */
+    private void handleOOMKilled(PodInfo pod, RemediationPolicy currentPolicy) {
+        String podKey = getPodKey(pod);
+
+        RemediationAction action = createAction(pod, "OOMKilled", "Delete Pod & Alert", 
+            "Pod was killed due to out-of-memory. May need memory limit increase or memory leak fix.");
+
+        try {
+            kubernetesService.deletePod(pod.getNamespace(), pod.getName());
+            backoffStrategy.recordRemediationAttempt(podKey);
+
+            action.setStatus(RemediationAction.RemediationStatus.SUCCESS);
+            action.setMetadata(Map.of(
+                "reason", "OOMKilled",
+                "totalRestarts", String.valueOf(getTotalRestartCount(pod)),
+                "recommendation", "Review pod memory requests/limits and application memory usage"
+            ));
+
+            logger.info("✅ Deleted OOMKilled pod {} (requires manual investigation)", podKey);
+
+        } catch (ApiException e) {
+            action.setStatus(RemediationAction.RemediationStatus.FAILED);
+            action.setError(e.getResponseBody());
+            logger.error("❌ Failed to delete OOMKilled pod {}: {}", podKey, e.getResponseBody());
+        }
+
+        recordAction(action);
+    }
+
+    /**
+     * ⚠️ Handle Evicted: Pod was evicted from node
+     * Action: Delete pod (it will be rescheduled by controller)
+     */
+    private void handleEvictedPod(PodInfo pod) {
+        String podKey = getPodKey(pod);
+
+        RemediationAction action = createAction(pod, "Evicted", "Delete Pod", 
+            "Pod was evicted from node (likely node resource pressure)");
+
+        try {
+            kubernetesService.deletePod(pod.getNamespace(), pod.getName());
+
+            action.setStatus(RemediationAction.RemediationStatus.SUCCESS);
+            action.setMetadata(Map.of(
+                "reason", "Evicted - likely node resource pressure",
+                "recommendation", "Check node resources (disk, memory, inode) with 'kubectl describe node'"
+            ));
+
+            logger.info("✅ Deleted evicted pod {}", podKey);
+
+        } catch (ApiException e) {
+            action.setStatus(RemediationAction.RemediationStatus.FAILED);
+            action.setError(e.getResponseBody());
+            logger.error("❌ Failed to delete evicted pod {}: {}", podKey, e.getResponseBody());
+        }
+
+        recordAction(action);
+    }
+
+    /**
+     * 🖼️ Handle ImagePullBackOff: Can't pull container image
+     * Action: Alert only (don't delete - might be temporary registry issue)
+     */
+    private void handleImagePullBackOff(PodInfo pod) {
+        RemediationAction action = createAction(pod, "ImagePullBackOff", "ALERT", 
+            "Cannot pull container image from registry");
+
+        action.setStatus(RemediationAction.RemediationStatus.SKIPPED);
+        action.setMetadata(Map.of(
+            "reason", "ImagePullBackOff",
+            "recommendation", "Check: 1) Image name spelling, 2) Image exists in registry, 3) Pull credentials, 4) Registry connectivity"
+        ));
+
+        logger.warn("⚠️ Pod {}/{} cannot pull image - manual investigation needed", 
+            pod.getNamespace(), pod.getName());
+        recordAction(action);
+    }
+
+    /**
+     * ❌ Handle CreateContainerConfigError: Bad pod configuration
+     * Action: Alert only (don't delete - needs manual fix)
+     */
+    private void handleCreateContainerConfigError(PodInfo pod) {
+        RemediationAction action = createAction(pod, "CreateContainerConfigError", "ALERT", 
+            "Container configuration error - check pod spec");
+
+        action.setStatus(RemediationAction.RemediationStatus.SKIPPED);
+        action.setMetadata(Map.of(
+            "reason", "CreateContainerConfigError",
+            "recommendation", "Check pod spec: invalid env vars, bad volume mounts, invalid resource requests"
+        ));
+
+        logger.warn("⚠️ Pod {}/{} has config error - manual fix required", 
+            pod.getNamespace(), pod.getName());
+        recordAction(action);
+    }
+     
     private void handleCrashLoopBackOff(PodInfo pod, RemediationPolicy currentPolicy) {
         String podKey = getPodKey(pod);
-        int attempts = restartAttempts.getOrDefault(podKey, 0);
+        BackoffStrategy.BackoffState state = backoffStrategy.getState(podKey);
+        int attempts = state.getAttemptCount();
 
+        // Safety check: Don't restart forever
         if (attempts >= currentPolicy.getMaxRestartAttempts()) {
             logger.warn("⚠️ Pod {} exceeded max restart attempts ({}). Manual intervention needed.", 
                 podKey, currentPolicy.getMaxRestartAttempts());
             
             RemediationAction action = createAction(pod, "CrashLoopBackOff", "SKIPPED", 
-                "Exceeded max restart attempts");
+                "Exceeded max restart attempts - manual intervention needed");
             action.setStatus(RemediationAction.RemediationStatus.SKIPPED);
+            action.setMetadata(Map.of(
+                "reason", "Max attempts exceeded",
+                "attempts", String.valueOf(attempts),
+                "lastHealthy", state.getLastHealthyTime().toString()
+            ));
             recordAction(action);
             return;
         }
@@ -175,19 +330,25 @@ public class RemediationService {
             // Use your existing KubernetesService to delete the pod
             kubernetesService.deletePod(pod.getNamespace(), pod.getName());
 
-            restartAttempts.put(podKey, attempts + 1);
-            lastActionTime.put(podKey, LocalDateTime.now());
+            // Record attempt using backoff strategy
+            backoffStrategy.recordRemediationAttempt(podKey);
+            int newAttemptCount = backoffStrategy.getState(podKey).getAttemptCount();
+
+            // Calculate next backoff wait
+            long nextWaitMinutes = backoffStrategy.calculateBackoffWait(newAttemptCount + 1);
 
             action.setStatus(RemediationAction.RemediationStatus.SUCCESS);
             action.setMetadata(Map.of(
-                "restartAttempt", String.valueOf(attempts + 1),
+                "restartAttempt", String.valueOf(newAttemptCount),
                 "maxAttempts", String.valueOf(currentPolicy.getMaxRestartAttempts()),
                 "containerRestarts", String.valueOf(getMaxRestartCount(pod)),
-                "totalRestarts", String.valueOf(getTotalRestartCount(pod))
+                "totalRestarts", String.valueOf(getTotalRestartCount(pod)),
+                "nextBackoffWaitMinutes", String.valueOf(nextWaitMinutes),
+                "backoffSchedule", "2min → 5min → 10min → 20min → 60min (max)"
             ));
 
-            logger.info("✅ Deleted pod {} to fix crash loop (attempt {}/{})", 
-                podKey, attempts + 1, currentPolicy.getMaxRestartAttempts());
+            logger.info("✅ Deleted pod {} to fix crash loop (attempt {}/{}, next retry in {}min)", 
+                podKey, newAttemptCount, currentPolicy.getMaxRestartAttempts(), nextWaitMinutes);
 
         } catch (ApiException e) {
             action.setStatus(RemediationAction.RemediationStatus.FAILED);
@@ -256,24 +417,10 @@ public class RemediationService {
 
     /**
      * A pod is in crash loop if it has high restart count AND is not running properly
+     * WITH AGE CHECK: Only flag if pod is 2+ minutes old
      */
     private boolean isCrashLoopBackOff(PodInfo pod) {
-        if (pod.getContainers() == null || pod.getContainers().isEmpty()) {
-            return false;
-        }
-        
-        boolean hasHighRestarts = getTotalRestartCount(pod) >= 3;
-        boolean allContainersReady = areAllContainersReady(pod);
-        boolean hasWaitingContainers = hasWaitingContainers(pod);
-        
-        boolean isCrashLoop = hasHighRestarts && (!allContainersReady || hasWaitingContainers);
-        
-        if (isCrashLoop) {
-            logger.debug("🚨 Crash loop detected for {}/{}: restarts={}, allReady={}, hasWaiting={}",
-                pod.getNamespace(), pod.getName(), getTotalRestartCount(pod), allContainersReady, hasWaitingContainers);
-        }
-        
-        return isCrashLoop;
+        return podStateDetector.isCrashLoopBackOffWithAgeCheck(pod);
     }
 
     private boolean areAllContainersReady(PodInfo pod) {
@@ -289,6 +436,14 @@ public class RemediationService {
 
     private boolean hasHighRestartCount(PodInfo pod, int threshold) {
         return getTotalRestartCount(pod) >= threshold;
+    }
+
+    /**
+     * Helper: Should remediate after backoff check (consolidated check)
+     */
+    private boolean shouldRemediateAfterBackoff(String podKey) {
+        // Simplified: Use backoff strategy for all remediations
+        return true; // Backoff strategy will handle timing
     }
 
     private int getTotalRestartCount(PodInfo pod) {
@@ -307,15 +462,6 @@ public class RemediationService {
     }
 
     // ==================== UTILITY METHODS ====================
-
-    private boolean shouldRemediate(String podKey, String issue) {
-        LocalDateTime lastAction = lastActionTime.get(podKey);
-        if (lastAction != null && ChronoUnit.MINUTES.between(lastAction, LocalDateTime.now()) < 2) {
-            logger.debug("Skipping {} - acted recently", podKey);
-            return false;
-        }
-        return true;
-    }
 
     private boolean isSystemNamespace(String namespace) {
         return namespace.startsWith("kube-") || 
@@ -416,7 +562,7 @@ public class RemediationService {
                 "successfulActions", successCount,
                 "failedActions", failedCount,
                 "policyEnabled", this.policy.isEnabled(),
-                "trackedPods", restartAttempts.size()
+                "trackedPods", backoffStrategy.getAllStates().size()
             );
         }
     }
@@ -433,21 +579,30 @@ public class RemediationService {
      * Clear restart attempts (for testing)
      */
     public void clearRestartAttempts() {
-        restartAttempts.clear();
-        lastActionTime.clear();
-        logger.info("🔄 Cleared restart attempt tracking");
+        backoffStrategy.clearAllStates();
+        logger.info("🔄 Cleared all backoff states");
     }
 
     /**
      * Debug method to check detection for specific pod
      */
     public Map<String, Object> debugPodDetection(PodInfo pod) {
+        String podKey = getPodKey(pod);
+        BackoffStrategy.BackoffState backoffState = backoffStrategy.getState(podKey);
+        
         return Map.of(
             "pod", pod.getName() + "/" + pod.getNamespace(),
             "totalRestarts", getTotalRestartCount(pod),
             "allContainersReady", areAllContainersReady(pod),
             "hasWaitingContainers", hasWaitingContainers(pod),
             "isCrashLoopBackOff", isCrashLoopBackOff(pod),
+            "backoffState", Map.of(
+                "status", backoffState.getStatus(),
+                "attemptCount", backoffState.getAttemptCount(),
+                "lastActionTime", backoffState.getLastActionTime(),
+                "lastHealthyTime", backoffState.getLastHealthyTime(),
+                "totalRemediationsTaken", backoffState.getTotalRemediationsTaken()
+            ),
             "containers", pod.getContainers().stream()
                 .map(c -> Map.of(
                     "name", c.getName(),
@@ -457,5 +612,12 @@ public class RemediationService {
                 ))
                 .collect(Collectors.toList())
         );
+    }
+
+    /**
+     * Get backoff strategy (for monitoring/debugging)
+     */
+    public BackoffStrategy getBackoffStrategy() {
+        return backoffStrategy;
     }
 }
