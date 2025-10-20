@@ -16,7 +16,7 @@ deploy:dev:
     - chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan -H $LOCAL_MACHINE_IP >> ~/.ssh/known_hosts 2>/dev/null
     # Create SSH tunnel (maps remote port 6443 to local k3d port 39165)
-    - ssh -f -N -L 6443:127.0.0.1:$LOCAL_K3D_PORT ${LOCAL_MACHINE_USER}@${LOCAL_MACHINE_IP}
+    - ssh -f -N -L 6443:127.0.0.1:${LOCAL_K3D_PORT} ${LOCAL_MACHINE_USER}@${LOCAL_MACHINE_IP} || { echo "SSH tunnel failed"; exit 1; }
     - sleep 2  # Give tunnel time to establish
     # Create kubeconfig
     - mkdir -p "$(dirname "$KUBECONFIG")"
