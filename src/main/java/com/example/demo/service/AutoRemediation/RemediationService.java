@@ -67,8 +67,13 @@ public class RemediationService {
      */
     @Scheduled(fixedDelay = 30000, initialDelay = 10000)
     public void monitorAndRemediate() {
+        
+
         // Read policy once at start of method (more efficient than multiple accesses)
         RemediationPolicy currentPolicy = this.policy;
+        if (currentPolicy.isDryRunEnabled()) {
+            logger.warn("🔄 ⚠️ DRY RUN MODE ENABLED - No pods will be deleted, only logged");
+        }
         
         if (!currentPolicy.isEnabled()) {
             logger.debug("Auto-remediation is disabled");
@@ -138,25 +143,19 @@ public class RemediationService {
                     if (shouldRemediateAfterBackoff(podKey)) {
                         logger.info("🔄 TAKING ACTION: Deleting evicted pod {}/{}", 
                             pod.getNamespace(), pod.getName());
-                        handleEvictedPod(pod);
+                        handleEvictedPod(pod, currentPolicy);
                         actionsTaken++;
                     }
                 }
 
-                // 3. Check for ImagePullBackOff (can't pull image)
-                else if (podStateDetector.isImagePullBackOff(pod)) {
-                    logger.info("🖼️ IMAGE PULL BACKOFF: {}/{}", pod.getNamespace(), pod.getName());
-                    issuesFound++;
-                    handleImagePullBackOff(pod);
-                    // Don't auto-remediate - likely a registry issue or wrong image name
-                }
+                
 
                 // 4. Check for CreateContainerConfigError (bad pod config)
                 else if (podStateDetector.isCreateContainerConfigError(pod)) {
                     logger.info("❌ CREATE CONTAINER CONFIG ERROR: {}/{}", 
                         pod.getNamespace(), pod.getName());
                     issuesFound++;
-                    handleCreateContainerConfigError(pod);
+                    handleCreateContainerConfigError(pod, currentPolicy);
                     // Don't auto-remediate - needs manual fix (bad spec/config)
                 }
 
@@ -188,6 +187,13 @@ public class RemediationService {
                             currentPolicy.getMaxRestartAttempts());
                     }
                 }
+                // 3. Check for ImagePullBackOff (can't pull image)
+                else if (podStateDetector.isImagePullBackOff(pod)) {
+                    logger.info("🖼️ IMAGE PULL BACKOFF: {}/{}", pod.getNamespace(), pod.getName());
+                    issuesFound++;
+                    handleImagePullBackOff(pod, currentPolicy);
+                    // Don't auto-remediate - likely a registry issue or wrong image name
+                }
 
                 
             }
@@ -206,12 +212,27 @@ public class RemediationService {
      * Action: Delete pod and alert ops (likely needs more memory)
      */
     private void handleOOMKilled(PodInfo pod, RemediationPolicy currentPolicy) {
-        String podKey = getPodKey(pod);
+    String podKey = getPodKey(pod);
 
-        RemediationAction action = createAction(pod, "OOMKilled", "Delete Pod & Alert", 
-            "Pod was killed due to out-of-memory. May need memory limit increase or memory leak fix.");
+    RemediationAction action = createAction(pod, "OOMKilled", "Delete Pod & Alert", 
+        "Pod was killed due to out-of-memory. May need memory limit increase or memory leak fix.");
 
-        try {
+    try {
+        if (currentPolicy.isDryRunEnabled()) {
+            // DRY RUN: Don't actually delete, just log what we would do
+            logger.info("🔄 [DRY RUN] Would delete OOMKilled pod {}/{} (would require manual investigation)", 
+                pod.getNamespace(), pod.getName());
+            
+            action.setStatus(RemediationAction.RemediationStatus.SUCCESS);
+            action.setMetadata(Map.of(
+                "reason", "OOMKilled",
+                "totalRestarts", String.valueOf(getTotalRestartCount(pod)),
+                "mode", "DRY_RUN",
+                "wouldDelete", "true",
+                "recommendation", "Review pod memory requests/limits and application memory usage"
+            ));
+        } else {
+            // LIVE MODE: Actually delete the pod
             kubernetesService.deletePod(pod.getNamespace(), pod.getName());
             backoffStrategy.recordRemediationAttempt(podKey);
 
@@ -219,41 +240,56 @@ public class RemediationService {
             action.setMetadata(Map.of(
                 "reason", "OOMKilled",
                 "totalRestarts", String.valueOf(getTotalRestartCount(pod)),
+                "mode", "LIVE",
+                "deleted", "true",
                 "recommendation", "Review pod memory requests/limits and application memory usage"
             ));
 
             logger.info("✅ Deleted OOMKilled pod {} (requires manual investigation)", podKey);
-
-        } catch (ApiException e) {
-            action.setStatus(RemediationAction.RemediationStatus.FAILED);
-            action.setError(e.getResponseBody());
-            logger.error("❌ Failed to delete OOMKilled pod {}: {}", podKey, e.getResponseBody());
         }
-
-        recordAction(action);
+    } catch (ApiException e) {
+        action.setStatus(RemediationAction.RemediationStatus.FAILED);
+        action.setError(e.getResponseBody());
+        logger.error("❌ Failed to delete OOMKilled pod {}: {}", podKey, e.getResponseBody());
     }
 
+    recordAction(action);
+}
+
     /**
-     * ⚠️ Handle Evicted: Pod was evicted from node
-     * Action: Delete pod (it will be rescheduled by controller)
+     * Handle Evicted pod with dry-run support
      */
-    private void handleEvictedPod(PodInfo pod) {
+    private void handleEvictedPod(PodInfo pod, RemediationPolicy currentPolicy) {
         String podKey = getPodKey(pod);
 
-        RemediationAction action = createAction(pod, "Evicted", "Delete Pod", 
+        RemediationAction action = createAction(pod, "Evicted", "Delete Pod",
             "Pod was evicted from node (likely node resource pressure)");
 
         try {
-            kubernetesService.deletePod(pod.getNamespace(), pod.getName());
+            if (currentPolicy.isDryRunEnabled()) {
+                logger.info("🔄 [DRY RUN] Would delete evicted pod {}/{}",
+                    pod.getNamespace(), pod.getName());
 
-            action.setStatus(RemediationAction.RemediationStatus.SUCCESS);
-            action.setMetadata(Map.of(
-                "reason", "Evicted - likely node resource pressure",
-                "recommendation", "Check node resources (disk, memory, inode) with 'kubectl describe node'"
-            ));
+                action.setStatus(RemediationAction.RemediationStatus.SUCCESS);
+                action.setMetadata(Map.of(
+                    "reason", "Evicted - likely node resource pressure",
+                    "mode", "DRY_RUN",
+                    "wouldDelete", "true",
+                    "recommendation", "Check node resources (disk, memory, inode) with 'kubectl describe node'"
+                ));
+            } else {
+                kubernetesService.deletePod(pod.getNamespace(), pod.getName());
 
-            logger.info("✅ Deleted evicted pod {}", podKey);
+                action.setStatus(RemediationAction.RemediationStatus.SUCCESS);
+                action.setMetadata(Map.of(
+                    "reason", "Evicted - likely node resource pressure",
+                    "mode", "LIVE",
+                    "deleted", "true",
+                    "recommendation", "Check node resources (disk, memory, inode) with 'kubectl describe node'"
+                ));
 
+                logger.info("✅ Deleted evicted pod {}", podKey);
+            }
         } catch (ApiException e) {
             action.setStatus(RemediationAction.RemediationStatus.FAILED);
             action.setError(e.getResponseBody());
@@ -264,43 +300,8 @@ public class RemediationService {
     }
 
     /**
-     * 🖼️ Handle ImagePullBackOff: Can't pull container image
-     * Action: Alert only (don't delete - might be temporary registry issue)
+     * Handle CrashLoopBackOff with dry-run support
      */
-    private void handleImagePullBackOff(PodInfo pod) {
-        RemediationAction action = createAction(pod, "ImagePullBackOff", "ALERT", 
-            "Cannot pull container image from registry");
-
-        action.setStatus(RemediationAction.RemediationStatus.SKIPPED);
-        action.setMetadata(Map.of(
-            "reason", "ImagePullBackOff",
-            "recommendation", "Check: 1) Image name spelling, 2) Image exists in registry, 3) Pull credentials, 4) Registry connectivity"
-        ));
-
-        logger.warn("⚠️ Pod {}/{} cannot pull image - manual investigation needed", 
-            pod.getNamespace(), pod.getName());
-        recordAction(action);
-    }
-
-    /**
-     * ❌ Handle CreateContainerConfigError: Bad pod configuration
-     * Action: Alert only (don't delete - needs manual fix)
-     */
-    private void handleCreateContainerConfigError(PodInfo pod) {
-        RemediationAction action = createAction(pod, "CreateContainerConfigError", "ALERT", 
-            "Container configuration error - check pod spec");
-
-        action.setStatus(RemediationAction.RemediationStatus.SKIPPED);
-        action.setMetadata(Map.of(
-            "reason", "CreateContainerConfigError",
-            "recommendation", "Check pod spec: invalid env vars, bad volume mounts, invalid resource requests"
-        ));
-
-        logger.warn("⚠️ Pod {}/{} has config error - manual fix required", 
-            pod.getNamespace(), pod.getName());
-        recordAction(action);
-    }
-     
     private void handleCrashLoopBackOff(PodInfo pod, RemediationPolicy currentPolicy) {
         String podKey = getPodKey(pod);
         BackoffStrategy.BackoffState state = backoffStrategy.getState(podKey);
@@ -308,10 +309,10 @@ public class RemediationService {
 
         // Safety check: Don't restart forever
         if (attempts >= currentPolicy.getMaxRestartAttempts()) {
-            logger.warn("⚠️ Pod {} exceeded max restart attempts ({}). Manual intervention needed.", 
+            logger.warn("⚠️ Pod {} exceeded max restart attempts ({}). Manual intervention needed.",
                 podKey, currentPolicy.getMaxRestartAttempts());
-            
-            RemediationAction action = createAction(pod, "CrashLoopBackOff", "SKIPPED", 
+
+            RemediationAction action = createAction(pod, "CrashLoopBackOff", "SKIPPED",
                 "Exceeded max restart attempts - manual intervention needed");
             action.setStatus(RemediationAction.RemediationStatus.SKIPPED);
             action.setMetadata(Map.of(
@@ -323,33 +324,50 @@ public class RemediationService {
             return;
         }
 
-        RemediationAction action = createAction(pod, "CrashLoopBackOff", "Delete Pod (Force Restart)", 
+        RemediationAction action = createAction(pod, "CrashLoopBackOff", "Delete Pod (Force Restart)",
             "Pod is in crash loop with " + getMaxRestartCount(pod) + " restarts");
 
         try {
-            // Use your existing KubernetesService to delete the pod
-            kubernetesService.deletePod(pod.getNamespace(), pod.getName());
+            if (currentPolicy.isDryRunEnabled()) {
+                // DRY RUN: Log what we would do
+                logger.info("🔄 [DRY RUN] Would delete pod {}/{} to fix crash loop (attempt {}/{})",
+                    pod.getNamespace(), pod.getName(), attempts + 1, currentPolicy.getMaxRestartAttempts());
 
-            // Record attempt using backoff strategy
-            backoffStrategy.recordRemediationAttempt(podKey);
-            int newAttemptCount = backoffStrategy.getState(podKey).getAttemptCount();
+                long nextWaitMinutes = backoffStrategy.calculateBackoffWait(attempts + 2);
 
-            // Calculate next backoff wait
-            long nextWaitMinutes = backoffStrategy.calculateBackoffWait(newAttemptCount + 1);
+                action.setStatus(RemediationAction.RemediationStatus.SUCCESS);
+                action.setMetadata(Map.of(
+                    "restartAttempt", String.valueOf(attempts + 1),
+                    "maxAttempts", String.valueOf(currentPolicy.getMaxRestartAttempts()),
+                    "containerRestarts", String.valueOf(getMaxRestartCount(pod)),
+                    "totalRestarts", String.valueOf(getTotalRestartCount(pod)),
+                    "mode", "DRY_RUN",
+                    "wouldDelete", "true",
+                    "nextBackoffWaitMinutes", String.valueOf(nextWaitMinutes),
+                    "backoffSchedule", "2min → 5min → 10min → 20min → 60min (max)"
+                ));
+            } else {
+                // LIVE MODE: Actually delete the pod
+                kubernetesService.deletePod(pod.getNamespace(), pod.getName());
+                backoffStrategy.recordRemediationAttempt(podKey);
+                int newAttemptCount = backoffStrategy.getState(podKey).getAttemptCount();
+                long nextWaitMinutes = backoffStrategy.calculateBackoffWait(newAttemptCount + 1);
 
-            action.setStatus(RemediationAction.RemediationStatus.SUCCESS);
-            action.setMetadata(Map.of(
-                "restartAttempt", String.valueOf(newAttemptCount),
-                "maxAttempts", String.valueOf(currentPolicy.getMaxRestartAttempts()),
-                "containerRestarts", String.valueOf(getMaxRestartCount(pod)),
-                "totalRestarts", String.valueOf(getTotalRestartCount(pod)),
-                "nextBackoffWaitMinutes", String.valueOf(nextWaitMinutes),
-                "backoffSchedule", "2min → 5min → 10min → 20min → 60min (max)"
-            ));
+                action.setStatus(RemediationAction.RemediationStatus.SUCCESS);
+                action.setMetadata(Map.of(
+                    "restartAttempt", String.valueOf(newAttemptCount),
+                    "maxAttempts", String.valueOf(currentPolicy.getMaxRestartAttempts()),
+                    "containerRestarts", String.valueOf(getMaxRestartCount(pod)),
+                    "totalRestarts", String.valueOf(getTotalRestartCount(pod)),
+                    "mode", "LIVE",
+                    "deleted", "true",
+                    "nextBackoffWaitMinutes", String.valueOf(nextWaitMinutes),
+                    "backoffSchedule", "2min → 5min → 10min → 20min → 60min (max)"
+                ));
 
-            logger.info("✅ Deleted pod {} to fix crash loop (attempt {}/{}, next retry in {}min)", 
-                podKey, newAttemptCount, currentPolicy.getMaxRestartAttempts(), nextWaitMinutes);
-
+                logger.info("✅ Deleted pod {} to fix crash loop (attempt {}/{}, next retry in {}min)",
+                    podKey, newAttemptCount, currentPolicy.getMaxRestartAttempts(), nextWaitMinutes);
+            }
         } catch (ApiException e) {
             action.setStatus(RemediationAction.RemediationStatus.FAILED);
             action.setError(e.getResponseBody());
@@ -360,7 +378,7 @@ public class RemediationService {
     }
 
     /**
-     * 🗑️ Handle Failed pods: Clean up old failed pods
+     * Handle Failed pod with dry-run support
      */
     private void handleFailedPod(PodInfo pod, RemediationPolicy currentPolicy) {
         if (!currentPolicy.isAutoDeleteFailedPods()) {
@@ -368,15 +386,30 @@ public class RemediationService {
             return;
         }
 
-        RemediationAction action = createAction(pod, "Failed", "Delete Failed Pod", 
+        RemediationAction action = createAction(pod, "Failed", "Delete Failed Pod",
             "Cleaning up failed pod");
 
         try {
-            kubernetesService.deletePod(pod.getNamespace(), pod.getName());
+            if (currentPolicy.isDryRunEnabled()) {
+                logger.info("🔄 [DRY RUN] Would delete failed pod {}/{}",
+                    pod.getNamespace(), pod.getName());
 
-            action.setStatus(RemediationAction.RemediationStatus.SUCCESS);
-            logger.info("✅ Deleted failed pod {}", getPodKey(pod));
+                action.setStatus(RemediationAction.RemediationStatus.SUCCESS);
+                action.setMetadata(Map.of(
+                    "mode", "DRY_RUN",
+                    "wouldDelete", "true"
+                ));
+            } else {
+                kubernetesService.deletePod(pod.getNamespace(), pod.getName());
 
+                action.setStatus(RemediationAction.RemediationStatus.SUCCESS);
+                action.setMetadata(Map.of(
+                    "mode", "LIVE",
+                    "deleted", "true"
+                ));
+
+                logger.info("✅ Deleted failed pod {}", getPodKey(pod));
+            }
         } catch (ApiException e) {
             action.setStatus(RemediationAction.RemediationStatus.FAILED);
             action.setError(e.getResponseBody());
@@ -412,6 +445,45 @@ public class RemediationService {
         logger.warn("⚠️ Pod {} is pending - check cluster resources", getPodKey(pod));
         recordAction(action);
     }
+
+
+    /**
+ * Handle ImagePullBackOff with dry-run support
+ */
+private void handleImagePullBackOff(PodInfo pod, RemediationPolicy currentPolicy) {
+    RemediationAction action = createAction(pod, "ImagePullBackOff", "ALERT", 
+        "Cannot pull container image from registry");
+
+    action.setStatus(RemediationAction.RemediationStatus.SKIPPED);
+    action.setMetadata(Map.of(
+        "reason", "ImagePullBackOff",
+        "mode", currentPolicy.isDryRunEnabled() ? "DRY_RUN" : "LIVE",
+        "recommendation", "Check: 1) Image name spelling, 2) Image exists in registry, 3) Pull credentials, 4) Registry connectivity"
+    ));
+
+    logger.warn("⚠️ Pod {}/{} cannot pull image - manual investigation needed", 
+        pod.getNamespace(), pod.getName());
+    recordAction(action);
+}
+
+/**
+ * Handle CreateContainerConfigError with dry-run support
+ */
+private void handleCreateContainerConfigError(PodInfo pod, RemediationPolicy currentPolicy) {
+    RemediationAction action = createAction(pod, "CreateContainerConfigError", "ALERT", 
+        "Container configuration error - check pod spec");
+
+    action.setStatus(RemediationAction.RemediationStatus.SKIPPED);
+    action.setMetadata(Map.of(
+        "reason", "CreateContainerConfigError",
+        "mode", currentPolicy.isDryRunEnabled() ? "DRY_RUN" : "LIVE",
+        "recommendation", "Check pod spec: invalid env vars, bad volume mounts, invalid resource requests"
+    ));
+
+    logger.warn("⚠️ Pod {}/{} has config error - manual fix required", 
+        pod.getNamespace(), pod.getName());
+    recordAction(action);
+}
 
     // ==================== DETECTION HELPERS ====================
 

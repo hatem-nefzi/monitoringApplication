@@ -13,6 +13,7 @@ public class RemediationPolicy {
     private boolean autoScaleOnHighCPU;       // Trigger HPA-like scaling
     private double cpuThresholdPercent;       // What's "high CPU"? (e.g., 80%)
     private boolean notifyOnAction;           // Send alerts when we act
+    private boolean dryRunEnabled = false;  // ← NEW: Dry-run mode
     
     // Constructor with safe defaults
     public RemediationPolicy() {
@@ -23,6 +24,7 @@ public class RemediationPolicy {
         this.autoScaleOnHighCPU = false;   // Let HPA handle this
         this.cpuThresholdPercent = 80.0;
         this.notifyOnAction = true;
+        this.dryRunEnabled = false; // ← NEW: Dry-run mode off by default
     }
 
     // Getters and Setters
@@ -57,5 +59,13 @@ public class RemediationPolicy {
     public boolean isNotifyOnAction() { return notifyOnAction; }
     public void setNotifyOnAction(boolean notifyOnAction) { 
         this.notifyOnAction = notifyOnAction; 
+    }
+     // ← NEW: Dry-run mode getters/setters
+    public boolean isDryRunEnabled() {
+        return dryRunEnabled;
+    }
+
+    public void setDryRunEnabled(boolean dryRunEnabled) {
+        this.dryRunEnabled = dryRunEnabled;
     }
 }

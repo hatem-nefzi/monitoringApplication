@@ -174,6 +174,26 @@ public class RemediationController {
             ));
         }
     }
+        @PostMapping("/policy")
+        public ResponseEntity<Map<String, Object>> updatePolicyFull(@RequestBody RemediationPolicy policy) {
+            try {
+                remediationService.updatePolicy(policy);
+                logger.info("Auto-remediation policy updated: {}", policy);
+                return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Policy updated successfully",
+                    "policy", policy
+                ));
+            } catch (Exception e) {
+                logger.error("Error updating policy", e);
+                return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+                ));
+            }
+        }
+
+    
 
     /**
      * 🏥 Health check for remediation service
