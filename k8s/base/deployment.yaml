@@ -67,6 +67,6 @@ spec:
               type: RuntimeDefault
           volumeMounts:
             - name: tmp-volume
-              mountPath: /tmp  # 🔥 Permet à l'app d’écrire dans /tmp
+              mountPath: /tmp  # 🔥 Permet à l'app d’écrire dans /tmp.
             - name: data-storage
               mountPath: /app/data  # Monter le volume de données si nécessaire
