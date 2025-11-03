@@ -2,10 +2,12 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization  #namespace: staging  removing namespace for testign purposes 
 resources:
 - ../../base
+- patches/remediator-role.yaml
   
 patches:
 - path: patches/deployment-patch.yaml
 - path: patches/cluster-rolebinding-patch.yaml
+
 
 images:
 - name: monitoring-backend

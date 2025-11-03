@@ -12,7 +12,6 @@ deploy:staging:
     OVERLAY_DIR: "k8s/overlays/production"
     KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
   before_script:
-
     - !reference [.k8s_job, before_script]
     - mkdir -p "$(dirname "$KUBECONFIG")"
     - |
@@ -40,5 +39,3 @@ deploy:staging:
   script:
     - !reference [.k8s_prepare_script, script]
     - !reference [.k8s_apply_overlay_script, script]
-
- 
