@@ -18,7 +18,7 @@ spec:
             memory: "384Mi"
             cpu: "200m"
         env:
-        # Staging-specific environment variables
+        # Staging-specific environment variables.
         - name: SPRING_PROFILES_ACTIVE
           value: "staging"
         - name: SERVER_PORT
