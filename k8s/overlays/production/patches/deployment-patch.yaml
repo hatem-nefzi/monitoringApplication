@@ -74,6 +74,7 @@ spec:
             - name: SPRING_DATASOURCE_HIKARI_MAX_LIFETIME
               value: "1800000"
             
+            
             # Disable H2 Console in Production
             - name: SPRING_H2_CONSOLE_ENABLED
               value: "false"
