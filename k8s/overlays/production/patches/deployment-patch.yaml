@@ -11,38 +11,159 @@ spec:
       maxUnavailable: 0
   template:
     spec:
-      serviceAccountName: monitoring-backend  
+      serviceAccountName: monitoring-backend
       containers:
-      - name: monitoring-backend
-        env:
-        - name: SPRING_PROFILES_ACTIVE
-          value: "kubernetes,production"
-        - name: ENVIRONMENT
-          value: "production"
-        - name: KUBERNETES_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        livenessProbe:
-          httpGet:
-            path: /actuator/health/liveness
-            port: 9090
-          initialDelaySeconds: 120
-          periodSeconds: 15
-          timeoutSeconds: 5
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /actuator/health/readiness
-            port: 9090
-          initialDelaySeconds: 60
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        resources:
-          limits:
-            memory: "768Mi"
-            cpu: "700m"
-          requests:
-            memory: "384Mi"
-            cpu: "350m"
+        - name: monitoring-backend
+          imagePullPolicy: IfNotPresent
+          env:
+            # Spring Profiles
+            - name: SPRING_PROFILES_ACTIVE
+              value: "kubernetes,production"
+            - name: ENVIRONMENT
+              value: "production"
+            - name: SERVER_PORT
+              value: "9090"
+            
+            # Kubernetes Namespace
+            - name: KUBERNETES_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            
+            # PostgreSQL Database Configuration
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres-service:5432/monitoring_db"
+            - name: SPRING_DATASOURCE_DRIVER_CLASS_NAME
+              value: "org.postgresql.Driver"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+            
+            # JPA/Hibernate Configuration
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "update"  # Use "validate" after initial schema creation
+            - name: SPRING_JPA_SHOW_SQL
+              value: "false"
+            - name: SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT
+              value: "org.hibernate.dialect.PostgreSQLDialect"
+            - name: SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL
+              value: "false"
+            - name: SPRING_JPA_PROPERTIES_HIBERNATE_JDBC_BATCH_SIZE
+              value: "20"
+            - name: SPRING_JPA_PROPERTIES_HIBERNATE_ORDER_INSERTS
+              value: "true"
+            - name: SPRING_JPA_PROPERTIES_HIBERNATE_ORDER_UPDATES
+              value: "true"
+            
+            # Connection Pool Settings (HikariCP)
+            - name: SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE
+              value: "20"
+            - name: SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE
+              value: "5"
+            - name: SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT
+              value: "30000"
+            - name: SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT
+              value: "600000"
+            - name: SPRING_DATASOURCE_HIKARI_MAX_LIFETIME
+              value: "1800000"
+            - name: SPRING_DATASOURCE_HIKARI_AUTO_COMMIT
+              value: "true"
+            
+            # Disable H2 Console in Production
+            - name: SPRING_H2_CONSOLE_ENABLED
+              value: "false"
+            
+            # Logging Configuration
+            - name: LOGGING_LEVEL_ROOT
+              value: "INFO"
+            - name: LOGGING_LEVEL_COM_EXAMPLE_DEMO
+              value: "INFO"
+            - name: LOGGING_LEVEL_ORG_SPRINGFRAMEWORK
+              value: "WARN"
+            - name: LOGGING_LEVEL_ORG_HIBERNATE
+              value: "WARN"
+            
+            # Redis Configuration
+            - name: REDIS_HOST
+              value: "redis-service"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: SPRING_DATA_REDIS_HOST
+              value: "redis-service"
+            - name: SPRING_DATA_REDIS_PORT
+              value: "6379"
+            - name: SPRING_DATA_REDIS_TIMEOUT
+              value: "60000"
+            - name: SPRING_DATA_REDIS_LETTUCE_POOL_MAX_ACTIVE
+              value: "8"
+            - name: SPRING_DATA_REDIS_LETTUCE_POOL_MAX_IDLE
+              value: "8"
+            - name: SPRING_DATA_REDIS_LETTUCE_POOL_MIN_IDLE
+              value: "2"
+            
+            # OpenTelemetry Configuration
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.production.svc.cluster.local:4318"
+            - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+              value: "http://otel-collector.production.svc.cluster.local:4318/v1/traces"
+            - name: OTEL_SERVICE_NAME
+              value: "monitoring-backend-production"
+            - name: OTEL_TRACES_EXPORTER
+              value: "otlp"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_traceidratio"
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: "0.1"  # Sample 10% of traces in production
+            
+            # Task Scheduling
+            - name: SPRING_TASK_SCHEDULING_POOL_SIZE
+              value: "4"
+            
+            # Actuator Configuration
+            - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+              value: "health,info,metrics,prometheus"
+            - name: MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED
+              value: "true"
+            - name: MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS
+              value: "when-authorized"
+            - name: MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED
+              value: "true"
+            - name: MANAGEMENT_HEALTH_READINESSSTATE_ENABLED
+              value: "true"
+          
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 9090
+            initialDelaySeconds: 120
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 9090
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          resources:
+            limits:
+              memory: "768Mi"
+              cpu: "700m"
+            requests:
+              memory: "384Mi"
+              cpu: "350m"
