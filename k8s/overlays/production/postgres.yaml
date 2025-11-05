@@ -20,7 +20,7 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: standard  # Change based on your cluster
+  storageClassName: local-path  # Change based on your cluster
 ---
 apiVersion: apps/v1
 kind: Deployment
