@@ -9,7 +9,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+
 import org.springframework.stereotype.Service;
+import com.example.demo.service.Cost.SmartRecommendationEngine;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -23,6 +25,10 @@ public class CostAnalysisService {
 
     @Autowired
     private PodMetricsService podMetricsService; // ✅ ADD THIS
+    //
+    @Autowired
+    
+    private SmartRecommendationEngine smartRecommendationEngine;
 
     @Value("${cost.cpu.per.hour:0.031}")
     private double cpuCostPerHour;
@@ -78,7 +84,7 @@ public CostAnalysis analyzeNamespaceCost(String namespace) throws ApiException {
     analysis.setEfficiencyScore(efficiencyScore);
 
     // Generate recommendations
-    List<CostRecommendation> recommendations = generateRecommendations(resourceCosts);
+    List<CostRecommendation> recommendations = generateRecommendations(resourceCosts, namespace);
     analysis.setRecommendations(recommendations);
 
     // ✅ Calculate total potential savings
@@ -203,13 +209,16 @@ private ResourceCost calculatePodCost(PodInfo pod, Map<String, String> actualUsa
         return count > 0 ? totalScore / count : 0;
     }
 
-   /**
- * Generate cost optimization recommendations
- */
+
+
 /**
- * Generate cost optimization recommendations
+ * Generate cost optimization recommendations (IMPROVED VERSION)
+ * 
+ * Two-tier approach:
+ * 1. Smart recommendations (using historical data) - production-safe
+ * 2. Fallback recommendations (current metrics) - for new pods without history
  */
-private List<CostRecommendation> generateRecommendations(List<ResourceCost> costs) {
+private List<CostRecommendation> generateRecommendations(List<ResourceCost> costs, String namespace) {
     List<CostRecommendation> recommendations = new ArrayList<>();
 
     for (ResourceCost cost : costs) {
@@ -219,110 +228,116 @@ private List<CostRecommendation> generateRecommendations(List<ResourceCost> cost
             continue;
         }
 
-        // ===== CPU OVER-PROVISIONING =====
-        if (cost.getCpuRequest() > 0.01 && cost.getCpuUsage() < cost.getCpuRequest() * 0.5) {
-            // Recommend max(10m, usage * 2.0) for better buffer
-            double recommended = Math.max(0.01, cost.getCpuUsage() * 2.0);
+        // ===== TRY SMART RECOMMENDATIONS FIRST (using history) =====
+        try {
+            List<CostRecommendation> smartRecs = smartRecommendationEngine
+                .generateSmartRecommendations(namespace, cost.getPodName());
+            
+            if (!smartRecs.isEmpty()) {
+                recommendations.addAll(smartRecs);
+                logger.info("✅ Using smart recommendations for {}", cost.getPodName());
+                continue; // Skip fallback logic
+            }
+        } catch (Exception e) {
+            logger.debug("Smart recommendations failed for {}, using fallback: {}", 
+                cost.getPodName(), e.getMessage());
+        }
+
+        // ===== FALLBACK: BASIC RECOMMENDATIONS (for new pods) =====
+        logger.info("📊 Using fallback recommendations for {} (insufficient history)", cost.getPodName());
+        
+        // Only make CONSERVATIVE recommendations without historical data
+        
+        // CPU OVER-PROVISIONING (very conservative threshold)
+        if (cost.getCpuRequest() > 0.05 && cost.getCpuUsage() < cost.getCpuRequest() * 0.3) {
+            double recommended = Math.max(0.01, cost.getCpuUsage() * 3.0); // 3x buffer!
             double savings = (cost.getCpuRequest() - recommended) * cpuCostPerHour * 24 * 30;
 
-            // Only add if savings > $0.10/month
-            if (savings > 0.10) {
-                recommendations.add(new CostRecommendation(
+            if (savings > 2.0) { // Higher threshold ($2/month)
+                CostRecommendation rec = new CostRecommendation(
                     cost.getPodName(),
                     "reduce_cpu",
                     String.format("CPU: %.3f cores (%.0fm)", cost.getCpuRequest(), cost.getCpuRequest() * 1000),
                     String.format("CPU: %.3f cores (%.0fm)", recommended, recommended * 1000),
                     savings,
-                    String.format("CPU usage is only %.1f%% of requested (using %.2fm out of %.0fm)", 
-                        (cost.getCpuUsage() / cost.getCpuRequest()) * 100,
+                    String.format("⚠️ PRELIMINARY: CPU usage <30%% of request (%.2fm out of %.0fm). " +
+                        "Needs more data for confident recommendation.",
                         cost.getCpuUsage() * 1000,
                         cost.getCpuRequest() * 1000)
-                ));
+                );
+                rec.setPriority("low"); // Mark as low confidence
+                recommendations.add(rec);
             }
         }
 
-        // ===== MEMORY OVER-PROVISIONING =====
-        if (cost.getMemoryRequest() > 0.05 && cost.getMemoryUsage() < cost.getMemoryRequest() * 0.65) {
-            // Recommend max(64Mi, usage * 1.4) for safety buffer
-            double recommended = Math.max(0.0625, cost.getMemoryUsage() * 1.4); // 0.0625 GB = 64Mi
+        // MEMORY OVER-PROVISIONING (very conservative)
+        if (cost.getMemoryRequest() > 0.25 && cost.getMemoryUsage() < cost.getMemoryRequest() * 0.4) {
+            double recommended = Math.max(0.125, cost.getMemoryUsage() * 2.5); // 2.5x buffer!
             double savings = (cost.getMemoryRequest() - recommended) * memoryCostPerHour * 24 * 30;
 
-            // Only add if savings > $0.05/month
-            if (savings > 0.05) {
-                recommendations.add(new CostRecommendation(
+            if (savings > 1.0) {
+                CostRecommendation rec = new CostRecommendation(
                     cost.getPodName(),
                     "reduce_memory",
                     String.format("Memory: %.2f GB (%.0fMi)", cost.getMemoryRequest(), cost.getMemoryRequest() * 1024),
                     String.format("Memory: %.2f GB (%.0fMi)", recommended, recommended * 1024),
                     savings,
-                    String.format("Memory usage is only %.1f%% of requested (using %.0fMi out of %.0fMi)", 
-                        (cost.getMemoryUsage() / cost.getMemoryRequest()) * 100,
+                    String.format("⚠️ PRELIMINARY: Memory usage <40%% of request (%.0fMi out of %.0fMi). " +
+                        "Needs more data for confident recommendation.",
                         cost.getMemoryUsage() * 1024,
                         cost.getMemoryRequest() * 1024)
-                ));
+                );
+                rec.setPriority("low");
+                recommendations.add(rec);
             }
         }
 
-        // ===== CPU UNDER-PROVISIONING =====
+        // UNDER-PROVISIONING (keep existing logic - this is critical!)
         if (cost.getCpuUsage() > cost.getCpuRequest() * 0.85 && cost.getCpuRequest() > 0) {
             double usagePercent = (cost.getCpuUsage() / cost.getCpuRequest()) * 100;
-            double recommended = cost.getCpuUsage() * 1.3; // 30% buffer above current usage
+            double recommended = cost.getCpuUsage() * 1.5; // Extra conservative for fallback
             
-            // ✅ Determine priority based on severity
-            String priority;
-            if (cost.getCpuUsage() > cost.getCpuRequest()) {
-                priority = "critical";  // Already exceeding limit!
-            } else if (usagePercent > 95) {
-                priority = "high";
-            } else {
-                priority = "medium";
-            }
+            String priority = cost.getCpuUsage() > cost.getCpuRequest() ? "critical" : 
+                            usagePercent > 95 ? "high" : "medium";
             
             CostRecommendation rec = new CostRecommendation(
                 cost.getPodName(),
                 "increase_cpu",
                 String.format("CPU: %.3f cores (%.0fm)", cost.getCpuRequest(), cost.getCpuRequest() * 1000),
                 String.format("CPU: %.3f cores (%.0fm)", recommended, recommended * 1000),
-                0,  // Not a savings
-                String.format("⚠️ CPU usage is %.1f%% of limit - pod may be throttled",
+                0,
+                String.format("⚠️ CPU usage is %.1f%% of limit - pod may be throttled. " +
+                    "Using conservative estimate without historical data.",
                     usagePercent)
             );
-            rec.setPriority(priority);  // ✅ Override constructor's priority
+            rec.setPriority(priority);
             recommendations.add(rec);
         }
         
-        // ===== MEMORY UNDER-PROVISIONING =====
         if (cost.getMemoryUsage() > cost.getMemoryRequest() * 0.85 && cost.getMemoryRequest() > 0) {
             double usagePercent = (cost.getMemoryUsage() / cost.getMemoryRequest()) * 100;
-            double recommended = cost.getMemoryUsage() * 1.3; // 30% buffer above current usage
+            double recommended = cost.getMemoryUsage() * 1.5;
             
-            // ✅ Determine priority based on severity
-            String priority;
-            if (cost.getMemoryUsage() > cost.getMemoryRequest()) {
-                priority = "critical";  // Already exceeding limit! Imminent OOMKill risk!
-            } else if (usagePercent > 95) {
-                priority = "high";
-            } else {
-                priority = "medium";
-            }
+            String priority = cost.getMemoryUsage() > cost.getMemoryRequest() ? "critical" : 
+                            usagePercent > 95 ? "high" : "medium";
             
             CostRecommendation rec = new CostRecommendation(
                 cost.getPodName(),
                 "increase_memory",
                 String.format("Memory: %.2f GB (%.0fMi)", cost.getMemoryRequest(), cost.getMemoryRequest() * 1024),
                 String.format("Memory: %.2f GB (%.0fMi)", recommended, recommended * 1024),
-                0,  // Not a savings
-                String.format("⚠️ Memory usage is %.1f%% of limit - pod may be OOMKilled",
+                0,
+                String.format("⚠️ Memory usage is %.1f%% of limit - pod may be OOMKilled. " +
+                    "Using conservative estimate without historical data.",
                     usagePercent)
             );
-            rec.setPriority(priority);  // ✅ Override constructor's priority
+            rec.setPriority(priority);
             recommendations.add(rec);
         }
     }
 
-    // ✅ Sort by priority first, then by savings
+    // Sort by priority first, then by savings
     recommendations.sort((a, b) -> {
-        // Priority order: critical > high > medium > low
         Map<String, Integer> priorityOrder = Map.of(
             "critical", 4,
             "high", 3,
@@ -334,16 +349,14 @@ private List<CostRecommendation> generateRecommendations(List<ResourceCost> cost
                             - priorityOrder.getOrDefault(a.getPriority(), 1);
         
         if (priorityCompare != 0) {
-            return priorityCompare;  // Sort by priority first
+            return priorityCompare;
         }
         
-        // Then by savings
         return Double.compare(b.getPotentialSavings(), a.getPotentialSavings());
     });
 
     return recommendations;
 }
-
     /**
      * Get cluster-wide cost summary
      */

@@ -1,7 +1,6 @@
 // src/main/java/com/example/demo/service/Cost/CostHistoryService.java
 package com.example.demo.service.Cost;
 
-import com.example.demo.model.Cost.CostAnalysis;
 import com.example.demo.model.Cost.CostSnapshot;
 import com.example.demo.repository.CostSnapshotRepository;
 import org.slf4j.Logger;
@@ -15,32 +14,19 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 📊 COST HISTORY & ANALYTICS SERVICE
+ * 
+ * Handles historical data retrieval, trend analysis, and cleanup.
+ * Does NOT create snapshots - that's CostSnapshotService's job.
+ * This breaks the circular dependency.
+ */
 @Service
 public class CostHistoryService {
     private static final Logger logger = LoggerFactory.getLogger(CostHistoryService.class);
     
     @Autowired
     private CostSnapshotRepository snapshotRepository;
-    
-    @Autowired
-    private CostAnalysisService costAnalysisService;
-    
-    /**
-     * Record a cost snapshot for a namespace
-     */
-    @Transactional
-    public CostSnapshot recordSnapshot(String namespace, CostAnalysis analysis) {
-        logger.info("📸 Recording cost snapshot for namespace: {}", namespace);
-        
-        CostSnapshot snapshot = new CostSnapshot(namespace, analysis);
-        CostSnapshot saved = snapshotRepository.save(snapshot);
-        
-        logger.info("✅ Snapshot saved: ${}/month for {} pods", 
-            String.format("%.2f", saved.getTotalMonthlyCost()), 
-            saved.getTotalPods());
-        
-        return saved;
-    }
     
     /**
      * Get cost history for a namespace (last N days)
@@ -157,53 +143,6 @@ public class CostHistoryService {
             "firstCost", history.get(0).getTotalMonthlyCost(),
             "lastCost", history.get(history.size() - 1).getTotalMonthlyCost()
         );
-    }
-    
-    /**
-     * Scheduled task to automatically snapshot all namespaces daily
-     * Runs at midnight every day
-     */
-    @Scheduled(cron = "0 0 0 * * *") // Run at midnight
-    @Transactional
-    public void autoSnapshotAllNamespaces() {
-        logger.info("🤖 Starting automatic cost snapshot for all namespaces");
-        
-        try {
-            List<String> namespaces = costAnalysisService.getAllNamespaces();
-            
-            for (String namespace : namespaces) {
-                if (namespace.startsWith("kube-")) {
-                    continue; // Skip system namespaces
-                }
-                
-                try {
-                    CostAnalysis analysis = costAnalysisService.analyzeNamespaceCost(namespace);
-                    recordSnapshot(namespace, analysis);
-                    logger.info("✅ Auto-snapshot saved for {}", namespace);
-                } catch (Exception e) {
-                    logger.error("❌ Failed to snapshot {}: {}", namespace, e.getMessage());
-                }
-            }
-            
-            logger.info("✅ Automatic snapshot complete for {} namespaces", namespaces.size());
-        } catch (Exception e) {
-            logger.error("❌ Automatic snapshot failed: {}", e.getMessage(), e);
-        }
-    }
-    
-    /**
-     * Manually trigger snapshot for a namespace
-     */
-    @Transactional
-    public CostSnapshot manualSnapshot(String namespace) {
-        try {
-            logger.info("📸 Manual snapshot triggered for {}", namespace);
-            CostAnalysis analysis = costAnalysisService.analyzeNamespaceCost(namespace);
-            return recordSnapshot(namespace, analysis);
-        } catch (Exception e) {
-            logger.error("❌ Manual snapshot failed for {}: {}", namespace, e.getMessage(), e);
-            throw new RuntimeException("Failed to create snapshot: " + e.getMessage());
-        }
     }
     
     /**

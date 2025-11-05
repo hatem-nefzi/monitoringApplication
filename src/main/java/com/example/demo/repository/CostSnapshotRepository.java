@@ -65,4 +65,17 @@ public interface CostSnapshotRepository extends JpaRepository<CostSnapshot, Stri
      * Delete old snapshots (for cleanup)
      */
     void deleteByTimestampBefore(LocalDateTime cutoffTime);
+      /**
+     * Find all snapshots for a namespace after a certain date, ordered by timestamp descending
+     */
+    List<CostSnapshot> findByNamespaceAndTimestampAfterOrderByTimestampDesc(
+        String namespace, LocalDateTime after);
+    
+    
+    
+   
+    
+   
+    
+  
 }

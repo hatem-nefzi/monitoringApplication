@@ -1,6 +1,16 @@
 package com.example.demo.model.Cost;
 
+import jakarta.persistence.*;
+
+
+//
+@Entity
+@Table(name = "resource_costs")
 public class ResourceCost {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
     private String podName;
     private String deploymentName;
     private double cpuRequest;      // in cores
