@@ -17,7 +17,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 //for the ml cost prediction endpoints
 import com.example.demo.service.Cost.CostPredictionService;
+import com.example.demo.service.Cost.CostSchedulerService;
 import com.example.demo.service.Cost.CostAnomalyDetector;
+
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -50,6 +52,8 @@ public class CostController {
 
     @Autowired
     private CostAnomalyDetector costAnomalyDetector;
+    @Autowired
+    private CostSchedulerService schedulerService;
 
     /**
      * Get cost analysis for a specific namespace
@@ -277,7 +281,7 @@ public ResponseEntity<Map<String, Object>> createSnapshot(@PathVariable String n
     try {
         logger.info("📸 Request: Manual snapshot for namespace '{}'", namespace);
         
-        CostSnapshot snapshot = costHistoryService.manualSnapshot(namespace);
+        CostSnapshot snapshot = schedulerService.manualSnapshot(namespace);
         
         return ResponseEntity.ok(Map.of(
             "success", true,
