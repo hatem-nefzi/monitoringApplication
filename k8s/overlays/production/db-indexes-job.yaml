@@ -1,0 +1,42 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-db-indexes
+  namespace: production
+spec:
+  template:
+    spec:
+      containers:
+      - name: postgres-client
+        image: postgres:16-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Creating indexes..."
+          PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB << 'EOF'
+          CREATE INDEX IF NOT EXISTS idx_cost_snapshots_namespace_timestamp ON cost_snapshots(namespace, timestamp DESC);
+          CREATE INDEX IF NOT EXISTS idx_resource_costs_pod_name ON resource_costs(pod_name);
+          CREATE INDEX IF NOT EXISTS idx_resource_costs_snapshot_pod ON resource_costs(snapshot_id, pod_name);
+          CREATE INDEX IF NOT EXISTS idx_cost_snapshots_timestamp ON cost_snapshots(timestamp);
+          EOF
+        env:
+        - name: POSTGRES_HOST
+          value: "postgres-service.production.svc.cluster.local"  # matches my Service name + namespace
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_PASSWORD
+      restartPolicy: Never
+  backoffLimit: 2
