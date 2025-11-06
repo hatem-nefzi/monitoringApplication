@@ -1,6 +1,7 @@
 // src/main/java/com/example/demo/service/Cost/CostHistoryService.java
 package com.example.demo.service.Cost;
 
+import com.example.demo.dto.PodMetricsHistoryDTO;
 import com.example.demo.model.Cost.CostSnapshot;
 import com.example.demo.model.Cost.ResourceCost;
 import com.example.demo.repository.CostSnapshotRepository;
@@ -191,8 +192,9 @@ public class CostHistoryService {
     /**
  * Get historical metrics for a specific pod (optimized)
  */
-public List<ResourceCost> getPodHistory(String namespace, String podName, int days) {
+public List<PodMetricsHistoryDTO> getPodHistory(String namespace, String podName, int days) {
     LocalDateTime since = LocalDateTime.now().minusDays(days);
     return snapshotRepository.findPodMetricsHistory(namespace, podName, since);
-} 
+}
+
 }

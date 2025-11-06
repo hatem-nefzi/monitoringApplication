@@ -1,5 +1,6 @@
 package com.example.demo.service.Cost;
 
+import com.example.demo.dto.PodMetricsHistoryDTO;
 import com.example.demo.model.Cost.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +53,7 @@ public List<CostRecommendation> generateSmartRecommendations(String namespace, S
         // 🚀 OPTIMIZATION: Fetch only this pod's history from database
         // Instead of: Get all pods → filter in memory
         // Now: Database does the filtering with indexed queries
-        List<ResourceCost> podHistory = historyService.getPodHistory(namespace, podName, 7);
+        List<PodMetricsHistoryDTO> podHistory = historyService.getPodHistory(namespace, podName, 7);
         
         if (podHistory.size() < MIN_SNAPSHOTS_REQUIRED) {
             logger.info("📊 Insufficient data for {} ({} snapshots, need {})", 

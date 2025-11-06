@@ -1,6 +1,7 @@
 // src/main/java/com/example/demo/repository/CostSnapshotRepository.java
 package com.example.demo.repository;
 
+import com.example.demo.dto.PodMetricsHistoryDTO;
 import com.example.demo.model.Cost.CostSnapshot;
 import com.example.demo.model.Cost.ResourceCost;
 
@@ -77,7 +78,7 @@ public interface CostSnapshotRepository extends JpaRepository<CostSnapshot, Stri
  * Get historical metrics for a specific pod across snapshots
  * Much more efficient than fetching all pods then filtering
  */
-@Query("SELECT new com.example.demo.model.Cost.ResourceCost(" +
+@Query("SELECT new com.example.demo.dto.PodMetricsHistoryDTO(" +
        "rc.podName, rc.cpuRequest, rc.cpuUsage, rc.memoryRequest, rc.memoryUsage, cs.timestamp) " +
        "FROM CostSnapshot cs " +
        "JOIN cs.podCosts rc " +
@@ -85,11 +86,14 @@ public interface CostSnapshotRepository extends JpaRepository<CostSnapshot, Stri
        "AND rc.podName = :podName " +
        "AND cs.timestamp >= :since " +
        "ORDER BY cs.timestamp ASC")
-List<ResourceCost> findPodMetricsHistory(
+List<PodMetricsHistoryDTO> findPodMetricsHistory(
     @Param("namespace") String namespace,
     @Param("podName") String podName,
     @Param("since") LocalDateTime since
 );
+
+
+
     
     
     
