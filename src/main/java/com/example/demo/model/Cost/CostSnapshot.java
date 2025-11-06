@@ -32,7 +32,7 @@ public class CostSnapshot {
     private double efficiencyScore;
     
     // ✅ ADD THIS: Store individual pod costs as JSON
-    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
+    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @JoinColumn(name = "snapshot_id")
     private List<ResourceCost> podCosts = new ArrayList<>();
     
