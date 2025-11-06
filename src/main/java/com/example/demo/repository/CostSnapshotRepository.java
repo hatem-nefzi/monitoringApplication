@@ -2,6 +2,8 @@
 package com.example.demo.repository;
 
 import com.example.demo.model.Cost.CostSnapshot;
+import com.example.demo.model.Cost.ResourceCost;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -70,6 +72,24 @@ public interface CostSnapshotRepository extends JpaRepository<CostSnapshot, Stri
      */
     List<CostSnapshot> findByNamespaceAndTimestampAfterOrderByTimestampDesc(
         String namespace, LocalDateTime after);
+
+    /**
+ * Get historical metrics for a specific pod across snapshots
+ * Much more efficient than fetching all pods then filtering
+ */
+@Query("SELECT new com.example.demo.model.Cost.ResourceCost(" +
+       "rc.podName, rc.cpuRequest, rc.cpuUsage, rc.memoryRequest, rc.memoryUsage, cs.timestamp) " +
+       "FROM CostSnapshot cs " +
+       "JOIN cs.podCosts rc " +
+       "WHERE cs.namespace = :namespace " +
+       "AND rc.podName = :podName " +
+       "AND cs.timestamp >= :since " +
+       "ORDER BY cs.timestamp ASC")
+List<ResourceCost> findPodMetricsHistory(
+    @Param("namespace") String namespace,
+    @Param("podName") String podName,
+    @Param("since") LocalDateTime since
+);
     
     
     

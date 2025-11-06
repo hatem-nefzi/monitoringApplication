@@ -2,6 +2,7 @@
 package com.example.demo.service.Cost;
 
 import com.example.demo.model.Cost.CostSnapshot;
+import com.example.demo.model.Cost.ResourceCost;
 import com.example.demo.repository.CostSnapshotRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -187,4 +188,11 @@ public class CostHistoryService {
             "totalSnapshots", allSnapshots.size()
         );
     }
+    /**
+ * Get historical metrics for a specific pod (optimized)
+ */
+public List<ResourceCost> getPodHistory(String namespace, String podName, int days) {
+    LocalDateTime since = LocalDateTime.now().minusDays(days);
+    return snapshotRepository.findPodMetricsHistory(namespace, podName, since);
+} 
 }

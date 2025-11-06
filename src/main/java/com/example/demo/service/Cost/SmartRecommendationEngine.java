@@ -42,48 +42,56 @@ public class SmartRecommendationEngine {
     /**
      * Generate intelligent recommendations using historical data
      */
-    public List<CostRecommendation> generateSmartRecommendations(String namespace, String podName) {
-        List<CostRecommendation> recommendations = new ArrayList<>();
+    /**
+ * Generate intelligent recommendations using historical data (OPTIMIZED)
+ */
+public List<CostRecommendation> generateSmartRecommendations(String namespace, String podName) {
+    List<CostRecommendation> recommendations = new ArrayList<>();
 
-        try {
-            // Get historical snapshots (last 7 days for meaningful patterns)
-            List<CostSnapshot> history = historyService.getCostHistory(namespace, 7);
-            
-            if (history.size() < MIN_SNAPSHOTS_REQUIRED) {
-                logger.info("📊 Insufficient data for {} ({} snapshots, need {})", 
-                    podName, history.size(), MIN_SNAPSHOTS_REQUIRED);
-                return recommendations; // Not enough data - don't recommend anything
-            }
-
-            // Extract this pod's metrics from history
-            List<ResourceMetrics> podHistory = extractPodMetrics(history, podName);
-            
-            if (podHistory.isEmpty()) {
-                logger.debug("No historical data found for pod {}", podName);
-                return recommendations;
-            }
-
-            // Get current resource requests
-            ResourceMetrics current = podHistory.get(podHistory.size() - 1);
-            
-            // Analyze CPU
-            CostRecommendation cpuRec = analyzeCpuUsage(podName, podHistory, current);
-            if (cpuRec != null) {
-                recommendations.add(cpuRec);
-            }
-
-            // Analyze Memory
-            CostRecommendation memRec = analyzeMemoryUsage(podName, podHistory, current);
-            if (memRec != null) {
-                recommendations.add(memRec);
-            }
-
-        } catch (Exception e) {
-            logger.error("Error generating smart recommendations for {}: {}", podName, e.getMessage());
+    try {
+        // 🚀 OPTIMIZATION: Fetch only this pod's history from database
+        // Instead of: Get all pods → filter in memory
+        // Now: Database does the filtering with indexed queries
+        List<ResourceCost> podHistory = historyService.getPodHistory(namespace, podName, 7);
+        
+        if (podHistory.size() < MIN_SNAPSHOTS_REQUIRED) {
+            logger.info("📊 Insufficient data for {} ({} snapshots, need {})", 
+                podName, podHistory.size(), MIN_SNAPSHOTS_REQUIRED);
+            return recommendations;
         }
 
-        return recommendations;
+        // Convert ResourceCost to ResourceMetrics (if needed)
+        List<ResourceMetrics> metrics = podHistory.stream()
+            .map(rc -> new ResourceMetrics(
+                rc.getCpuRequest(),
+                rc.getCpuUsage(),
+                rc.getMemoryRequest(),
+                rc.getMemoryUsage()
+            ))
+            .collect(Collectors.toList());
+
+        // Get current resource requests (last snapshot)
+        ResourceMetrics current = metrics.get(metrics.size() - 1);
+        
+        // Analyze CPU
+        CostRecommendation cpuRec = analyzeCpuUsage(podName, metrics, current);
+        if (cpuRec != null) {
+            recommendations.add(cpuRec);
+        }
+
+        // Analyze Memory
+        CostRecommendation memRec = analyzeMemoryUsage(podName, metrics, current);
+        if (memRec != null) {
+            recommendations.add(memRec);
+        }
+
+    } catch (Exception e) {
+        logger.error("Error generating smart recommendations for {}: {}", podName, e.getMessage());
     }
+
+    return recommendations;
+}
+
 
     /**
      * Analyze CPU usage patterns and generate recommendation
@@ -312,7 +320,8 @@ public class SmartRecommendationEngine {
     /**
      * Extract pod metrics from snapshots
      */
-    private List<ResourceMetrics> extractPodMetrics(List<CostSnapshot> history, String podName) {
+    /* 
+    private List<ResourceMetrics> extractPodMetrics(List<ResourceCost> podHistory) {
         List<ResourceMetrics> metrics = new ArrayList<>();
         
         for (CostSnapshot snapshot : history) {
@@ -330,7 +339,8 @@ public class SmartRecommendationEngine {
         }
         
         return metrics;
-    }
+    }  */
+      // this above method is not needed anymore due to optimization in data fetching
 
     // Formatting helpers
     private String formatCpu(double cores) {
