@@ -3,7 +3,7 @@ package com.example.demo.model.Cost;
 import java.time.LocalDateTime;
 
 /**
- * ⚠️ Cost Anomaly Model
+ * Cost Anomaly Model
  * Represents detected unusual cost patterns
  */
 public class CostAnomaly {

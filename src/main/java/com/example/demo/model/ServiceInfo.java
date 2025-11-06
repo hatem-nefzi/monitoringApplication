@@ -14,5 +14,4 @@ public class ServiceInfo {
     private String creationTimestamp;
     private List<ServicePort> ports;
     
-    // No need to define the constructor unless you want a custom one.
 }

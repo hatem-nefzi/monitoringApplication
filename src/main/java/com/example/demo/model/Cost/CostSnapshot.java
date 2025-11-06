@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 📸 COST SNAPSHOT - Point-in-time cost data
+ *  COST SNAPSHOT - Point-in-time cost data
  * Stores historical cost information for trend analysis
  */
 @Entity
@@ -31,7 +31,7 @@ public class CostSnapshot {
     private int totalPods;
     private double efficiencyScore;
     
-    // ✅ ADD THIS: Store individual pod costs as JSON
+    //  Store individual pod costs as JSON
     @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @JoinColumn(name = "snapshot_id")
     private List<ResourceCost> podCosts = new ArrayList<>();

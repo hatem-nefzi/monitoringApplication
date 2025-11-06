@@ -3,7 +3,7 @@ package com.example.demo.model.Cost;
 import java.time.LocalDateTime;
 
 /**
- * 📈 Cost Forecast Model
+ *  Cost Forecast Model
  * Represents predicted future costs based on historical trends
  */
 public class CostForecast {
