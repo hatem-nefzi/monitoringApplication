@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import io.kubernetes.client.custom.Quantity;
+import com.example.demo.service.CacheService;
 
 @Service
 public class KubernetesService {
@@ -36,6 +37,9 @@ public class KubernetesService {
     private final PodMetricsService metricsService;
     private final AppsV1Api appsV1Api;
     private final NetworkingV1Api networkingV1Api;
+    @Autowired
+    private CacheService cacheService;
+
 
     @Value("${kubernetes.namespace:default}")
     private String configuredNamespace;
@@ -68,15 +72,36 @@ public class KubernetesService {
     }
 
     public List<PodInfo> getPodInfoClusterWide() throws ApiException {
-        logger.debug("Fetching pod info for all namespaces");
-        try {
-            V1PodList podList = coreV1Api.listPodForAllNamespaces(null, null, null, null, null, null, null, null, null, null);
-            return podList.getItems().stream().map(this::convertV1PodToPodInfo).collect(Collectors.toList());
-        } catch (ApiException e) {
-            logger.error("Failed to fetch pods for all namespaces: {}", e.getResponseBody(), e);
-            throw e;
-        }
+    logger.debug("Fetching pod info for all namespaces (with Redis caching)");
+
+    // 1️⃣ Try Redis cache first
+    List<PodInfo> cachedPods = cacheService.getCachedPodData();
+    if (cachedPods != null && !cachedPods.isEmpty()) {
+        logger.info("✅ Returning pod data from Redis cache ({} pods)", cachedPods.size());
+        return cachedPods;
     }
+
+    // 2️⃣ Cache miss → Fetch from K8s API
+    try {
+        logger.info("❌ Cache miss — fetching fresh data from Kubernetes API");
+        V1PodList podList = coreV1Api.listPodForAllNamespaces(
+                null, null, null, null, null, null, null, null, null, null);
+
+        List<PodInfo> pods = podList.getItems().stream()
+                .map(this::convertV1PodToPodInfo)
+                .collect(Collectors.toList());
+
+        // 3️⃣ Store in Redis
+        cacheService.cachePodData(new ArrayList<>(pods));
+        logger.info("✅ Cached {} pods in Redis", pods.size());
+
+        return pods;
+    } catch (ApiException e) {
+        logger.error("Failed to fetch pods for all namespaces: {}", e.getResponseBody(), e);
+        throw e;
+    }
+}
+
 
     private PodInfo mapPodToPodInfo(V1Pod pod) {
         Map<String, V1Container> containerSpecs = pod.getSpec().getContainers().stream()
