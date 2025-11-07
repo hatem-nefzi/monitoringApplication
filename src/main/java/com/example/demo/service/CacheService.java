@@ -55,8 +55,8 @@ public class CacheService {
             redisAvailable = false;
         }
     }
-    
-    public List<Object> cachePodData(List<Object> pods) {
+
+    public List<PodInfo> cachePodData(List<PodInfo> pods) {
         if (redisTemplate == null) {
             logger.debug("Redis template not available - skipping cache");
             return pods;
@@ -164,19 +164,26 @@ public class CacheService {
         
         logger.info("Cache hit - retrieved data of type: {}", cached.getClass().getName());
         
-        if (cached instanceof List) {
-            List<PodInfo> pods = (List<PodInfo>) cached;
-            logger.info("Successfully deserialized {} pods from cache", pods.size());
-            return pods;
-        } else {
-            logger.warn("Cached data is not a List, it's a: {}", cached.getClass());
-            return null;
-        }
+        // Cast directly - your RedisConfig with type info should handle this
+        @SuppressWarnings("unchecked")
+        List<PodInfo> pods = (List<PodInfo>) cached;
         
+        logger.info("Successfully deserialized {} pods from cache", pods.size());
+        return pods;
+        
+    } catch (ClassCastException e) {
+        logger.error("❌ Type mismatch in cache - clearing corrupt data: {}", e.getMessage());
+        try {
+            redisTemplate.delete("pods:all");
+            logger.info("Cleared corrupt cache");
+        } catch (Exception ex) {
+            logger.error("Failed to clear cache: {}", ex.getMessage());
+        }
+        return null;
     } catch (Exception e) {
         logger.error("Error retrieving cached pod data: {}", e.getMessage(), e);
         return null;
-    }
+    } 
 }
     /**
  * Store remediation action in Redis

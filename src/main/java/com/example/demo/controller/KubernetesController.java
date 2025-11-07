@@ -104,7 +104,7 @@ public ResponseEntity<?> getPods(HttpServletRequest request) {
             logger.debug("Successfully fetched {} pods from Kubernetes", pods.size());
             
             // Cache for next time
-            cacheService.cachePodData((List<Object>)(List<?>) pods);
+            cacheService.cachePodData((List<PodInfo>)(List<?>) pods);
         } else {
             logger.info("Cache hit - returning {} cached pods", pods.size());
         }
