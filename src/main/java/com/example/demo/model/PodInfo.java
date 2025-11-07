@@ -6,6 +6,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 @Data
 public class PodInfo {
     private String name;
@@ -48,6 +50,7 @@ public class PodInfo {
         this.creationTimestamp = creationTimestamp;
     }
 
+    @JsonIgnore
     public String getIdentifier() {
         return namespace + "/" + name;
     }
