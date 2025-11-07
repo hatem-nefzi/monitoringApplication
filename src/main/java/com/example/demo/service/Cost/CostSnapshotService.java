@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 📸 SNAPSHOT CREATION SERVICE
+ * SNAPSHOT CREATION SERVICE
  * 
  * Responsible ONLY for creating and saving snapshots.
  * This breaks the circular dependency by separating snapshot logic

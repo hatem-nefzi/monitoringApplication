@@ -50,7 +50,7 @@ public List<CostRecommendation> generateSmartRecommendations(String namespace, S
     List<CostRecommendation> recommendations = new ArrayList<>();
 
     try {
-        // 🚀 OPTIMIZATION: Fetch only this pod's history from database
+        //  OPTIMIZATION: Fetch only this pod's history from database
         // Instead of: Get all pods → filter in memory
         // Now: Database does the filtering with indexed queries
         List<PodMetricsHistoryDTO> podHistory = historyService.getPodHistory(namespace, podName, 7);
