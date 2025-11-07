@@ -23,7 +23,9 @@ spec:
               value: "production"
             - name: SERVER_PORT
               value: "9090"
-            
+            - name: JAVA_TOOLS_OPTIONS
+              value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:MaxMetaspaceSize=128m"
+
             # Kubernetes Namespace
             - name: KUBERNETES_NAMESPACE
               valueFrom:
@@ -161,8 +163,8 @@ spec:
           
           resources:
             limits:
-              memory: "768Mi"
-              cpu: "700m"
+              memory: "1Gi"
+              cpu: "500m"
             requests:
-              memory: "384Mi"
-              cpu: "350m"
+              memory: "520Mi"
+              cpu: "300m"
