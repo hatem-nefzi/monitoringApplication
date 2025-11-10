@@ -87,7 +87,7 @@ public class CostSchedulerService {
         try {
             logger.info("📸 Manual snapshot triggered for {}", namespace);
             
-            // Analyze current costs
+            // Analyze current costs.
             CostAnalysis analysis = costAnalysisService.analyzeNamespaceCost(namespace);
             
             // Create snapshot
