@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
- * ⏰ COST SNAPSHOT SCHEDULER
+ *  COST SNAPSHOT SCHEDULER
  * 
  * Handles automatic snapshot creation on a schedule.
  * This is separate from CostHistoryService to avoid circular dependencies.
