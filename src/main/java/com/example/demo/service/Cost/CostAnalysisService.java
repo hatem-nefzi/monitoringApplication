@@ -3,7 +3,7 @@ package com.example.demo.service.Cost;
 import com.example.demo.model.Cost.*;
 import com.example.demo.model.PodInfo;
 import com.example.demo.service.KubernetesService;
-import com.example.demo.service.PodMetricsService; // ✅ ADD THIS
+import com.example.demo.service.PodMetricsService; 
 import io.kubernetes.client.openapi.ApiException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,8 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 
 import org.springframework.stereotype.Service;
-import com.example.demo.service.Cost.SmartRecommendationEngine;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -24,11 +22,13 @@ public class CostAnalysisService {
     private KubernetesService kubernetesService;
 
     @Autowired
-    private PodMetricsService podMetricsService; // ✅ ADD THIS
+    private PodMetricsService podMetricsService; 
     //
     @Autowired
     
     private SmartRecommendationEngine smartRecommendationEngine;
+    //
+   
 
     @Value("${cost.cpu.per.hour:0.031}")
     private double cpuCostPerHour;
@@ -43,7 +43,10 @@ public class CostAnalysisService {
  * Analyze costs for a specific namespace
  */
 public CostAnalysis analyzeNamespaceCost(String namespace) throws ApiException {
-    logger.info("💰 Analyzing costs for namespace: {}", namespace);
+    
+    
+    logger.info(" Analyzing costs for namespace: {}", namespace);
+    
 
     List<PodInfo> pods = kubernetesService.getPodInfoClusterWide().stream()
         .filter(pod -> pod.getNamespace().equals(namespace))
@@ -59,10 +62,10 @@ public CostAnalysis analyzeNamespaceCost(String namespace) throws ApiException {
     List<ResourceCost> resourceCosts = new ArrayList<>();
 
     for (PodInfo pod : pods) {
-        // ✅ FETCH ACTUAL USAGE METRICS (from metrics server)
+        //  FETCH ACTUAL USAGE METRICS (from metrics server)
         Map<String, String> actualUsage = podMetricsService.getPodMetrics(namespace, pod.getName());
         
-        // ✅ FETCH RESOURCE REQUESTS (from pod spec)
+        //  FETCH RESOURCE REQUESTS (from pod spec)
         Map<String, String> resourceRequests = kubernetesService.getPodResourceRequests(namespace, pod.getName());
         
         ResourceCost podCost = calculatePodCost(pod, actualUsage, resourceRequests);
@@ -87,12 +90,12 @@ public CostAnalysis analyzeNamespaceCost(String namespace) throws ApiException {
     List<CostRecommendation> recommendations = generateRecommendations(resourceCosts, namespace);
     analysis.setRecommendations(recommendations);
 
-    // ✅ Calculate total potential savings
+    //  Calculate total potential savings
     double totalSavings = recommendations.stream()
         .mapToDouble(CostRecommendation::getPotentialSavings)
         .sum();
     
-    logger.info("✅ Cost analysis complete: ${}/month for {} pods ({}% efficient) - Potential savings: ${}/month", 
+    logger.info(" Cost analysis complete: ${}/month for {} pods ({}% efficient) - Potential savings: ${}/month", 
         String.format("%.2f", analysis.getMonthlyCost()), 
         pods.size(), 
         String.format("%.0f", efficiencyScore),
@@ -108,11 +111,11 @@ private ResourceCost calculatePodCost(PodInfo pod, Map<String, String> actualUsa
     cost.setPodName(pod.getName());
     cost.setDeploymentName(extractDeploymentName(pod.getName()));
 
-    // ✅ GET RESOURCE REQUESTS FROM POD SPEC (NOT FROM pod.getMetrics()!)
+    //  GET RESOURCE REQUESTS FROM POD SPEC (NOT FROM pod.getMetrics()!)
     double cpuRequest = parseResourceValue(resourceRequests.getOrDefault("cpuRequest", "100m"));
     double memoryRequest = parseMemoryToGb(resourceRequests.getOrDefault("memoryRequest", "128Mi"));
     
-    // ✅ GET ACTUAL USAGE from metrics server
+    //  GET ACTUAL USAGE from metrics server
     double cpuUsage = 0;
     double memoryUsage = 0;
     
@@ -120,7 +123,7 @@ private ResourceCost calculatePodCost(PodInfo pod, Map<String, String> actualUsa
         cpuUsage = parseResourceValue(actualUsage.getOrDefault("cpu", "0m"));
         memoryUsage = parseMemoryToGb(actualUsage.getOrDefault("memory", "0Mi"));
     } else {
-        logger.warn("⚠️ No metrics available for pod {}, assuming 0 usage", pod.getName());
+        logger.warn(" No metrics available for pod {}, assuming 0 usage", pod.getName());
     }
 
     cost.setCpuRequest(cpuRequest);
@@ -160,7 +163,7 @@ private ResourceCost calculatePodCost(PodInfo pod, Map<String, String> actualUsa
 }
 
     /**
-     * ✅ EXTRACT DEPLOYMENT NAME FROM POD NAME
+     *  EXTRACT DEPLOYMENT NAME FROM POD NAME
      * Pattern: deployment-name-replicaset-hash-pod-hash
      */
     private String extractDeploymentName(String podName) {
@@ -189,7 +192,7 @@ private ResourceCost calculatePodCost(PodInfo pod, Map<String, String> actualUsa
         int count = 0;
 
         for (ResourceCost cost : costs) {
-            // ✅ HANDLE ZERO REQUESTS GRACEFULLY
+            //  HANDLE ZERO REQUESTS GRACEFULLY
             double cpuEfficiency = 100.0; // Default to 100% if no request
             double memoryEfficiency = 100.0;
             
@@ -235,7 +238,7 @@ private List<CostRecommendation> generateRecommendations(List<ResourceCost> cost
             
             if (!smartRecs.isEmpty()) {
                 recommendations.addAll(smartRecs);
-                logger.info("✅ Using smart recommendations for {}", cost.getPodName());
+                logger.info(" Using smart recommendations for {}", cost.getPodName());
                 continue; // Skip fallback logic
             }
         } catch (Exception e) {
@@ -244,7 +247,7 @@ private List<CostRecommendation> generateRecommendations(List<ResourceCost> cost
         }
 
         // ===== FALLBACK: BASIC RECOMMENDATIONS (for new pods) =====
-        logger.info("📊 Using fallback recommendations for {} (insufficient history)", cost.getPodName());
+        logger.info(" Using fallback recommendations for {} (insufficient history)", cost.getPodName());
         
         // Only make CONSERVATIVE recommendations without historical data
         
@@ -260,7 +263,7 @@ private List<CostRecommendation> generateRecommendations(List<ResourceCost> cost
                     String.format("CPU: %.3f cores (%.0fm)", cost.getCpuRequest(), cost.getCpuRequest() * 1000),
                     String.format("CPU: %.3f cores (%.0fm)", recommended, recommended * 1000),
                     savings,
-                    String.format("⚠️ PRELIMINARY: CPU usage <30%% of request (%.2fm out of %.0fm). " +
+                    String.format(" PRELIMINARY: CPU usage <30%% of request (%.2fm out of %.0fm). " +
                         "Needs more data for confident recommendation.",
                         cost.getCpuUsage() * 1000,
                         cost.getCpuRequest() * 1000)
@@ -282,7 +285,7 @@ private List<CostRecommendation> generateRecommendations(List<ResourceCost> cost
                     String.format("Memory: %.2f GB (%.0fMi)", cost.getMemoryRequest(), cost.getMemoryRequest() * 1024),
                     String.format("Memory: %.2f GB (%.0fMi)", recommended, recommended * 1024),
                     savings,
-                    String.format("⚠️ PRELIMINARY: Memory usage <40%% of request (%.0fMi out of %.0fMi). " +
+                    String.format(" PRELIMINARY: Memory usage <40%% of request (%.0fMi out of %.0fMi). " +
                         "Needs more data for confident recommendation.",
                         cost.getMemoryUsage() * 1024,
                         cost.getMemoryRequest() * 1024)
@@ -306,7 +309,7 @@ private List<CostRecommendation> generateRecommendations(List<ResourceCost> cost
                 String.format("CPU: %.3f cores (%.0fm)", cost.getCpuRequest(), cost.getCpuRequest() * 1000),
                 String.format("CPU: %.3f cores (%.0fm)", recommended, recommended * 1000),
                 0,
-                String.format("⚠️ CPU usage is %.1f%% of limit - pod may be throttled. " +
+                String.format(" CPU usage is %.1f%% of limit - pod may be throttled. " +
                     "Using conservative estimate without historical data.",
                     usagePercent)
             );
@@ -327,7 +330,7 @@ private List<CostRecommendation> generateRecommendations(List<ResourceCost> cost
                 String.format("Memory: %.2f GB (%.0fMi)", cost.getMemoryRequest(), cost.getMemoryRequest() * 1024),
                 String.format("Memory: %.2f GB (%.0fMi)", recommended, recommended * 1024),
                 0,
-                String.format("⚠️ Memory usage is %.1f%% of limit - pod may be OOMKilled. " +
+                String.format(" Memory usage is %.1f%% of limit - pod may be OOMKilled. " +
                     "Using conservative estimate without historical data.",
                     usagePercent)
             );
@@ -364,7 +367,7 @@ private List<CostRecommendation> generateRecommendations(List<ResourceCost> cost
  * Get cluster-wide cost summary
  */
 public ClusterCostSummary getClusterCostSummary() throws ApiException {
-    logger.info("💰 Calculating cluster-wide cost summary");
+    logger.info(" Calculating cluster-wide cost summary");
 
     List<String> namespaces = kubernetesService.getNamespaces();
     Map<String, Double> costByNamespace = new HashMap<>();
@@ -374,7 +377,7 @@ public ClusterCostSummary getClusterCostSummary() throws ApiException {
     int totalPods = 0;
     int efficientPods = 0;
     int overProvisionedPods = 0;
-    int underProvisionedPods = 0;  // ✅ Track under-provisioned too
+    int underProvisionedPods = 0;  //  Track under-provisioned too
     double totalEfficiency = 0;
     int namespaceCount = 0;
 
@@ -442,17 +445,17 @@ public ClusterCostSummary getClusterCostSummary() throws ApiException {
     summary.setMostExpensiveNamespace(mostExpensive);
     summary.setLeastEfficientNamespace(leastEfficient);  // ✅ Now populated!
 
-    logger.info("✅ Cluster summary: ${}/month total, ${}/month wasted ({}% efficient)", 
+    logger.info(" Cluster summary: ${}/month total, ${}/month wasted ({}% efficient)", 
         String.format("%.2f", totalCost),
         String.format("%.2f", totalWaste),
         String.format("%.0f", summary.getAverageEfficiencyScore()));
     
     // ✅ Log critical insights
     if (underProvisionedPods > 0) {
-        logger.warn("⚠️ {} pods are under-provisioned - immediate action required!", underProvisionedPods);
+        logger.warn(" {} pods are under-provisioned - immediate action required!", underProvisionedPods);
     }
     if (totalWaste / totalCost > 0.7) {
-        logger.warn("⚠️ Over 70% of resources are wasted - significant optimization opportunity!");
+        logger.warn(" Over 70% of resources are wasted - significant optimization opportunity!");
     }
 
     return summary;

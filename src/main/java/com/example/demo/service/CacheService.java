@@ -175,4 +175,9 @@ public class CacheService {
         if (redisTemplate == null) return "RedisTemplate is null";
         return redisAvailable ? "Available" : "Unavailable";
     }
+
+
+    public RedisTemplate<String, Object> getRedisTemplate() {
+        return redisTemplate;
+    }
 }
