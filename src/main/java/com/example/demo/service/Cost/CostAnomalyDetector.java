@@ -16,7 +16,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * ⚠️ COST ANOMALY DETECTOR
+ *  COST ANOMALY DETECTOR
  * Detects unusual cost patterns and spikes
  */
 @Service
@@ -39,7 +39,7 @@ public class CostAnomalyDetector {
      * Detect anomalies for a specific namespace
      */
     public List<CostAnomaly> detectAnomalies(String namespace) {
-        logger.info("🔍 Detecting cost anomalies for namespace: {}", namespace);
+        logger.info(" Detecting cost anomalies for namespace: {}", namespace);
 
         List<CostAnomaly> anomalies = new ArrayList<>();
 
