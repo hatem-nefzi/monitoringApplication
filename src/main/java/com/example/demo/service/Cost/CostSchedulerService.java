@@ -41,7 +41,7 @@ public class CostSchedulerService {
      * Scheduled task to automatically snapshot all namespaces daily
      * Runs at midnight every day
      */
-    @Scheduled(cron = "0 0 0 * * *") // Run at midnight
+    @Scheduled(cron = "0 */15 * * * *") // Run every 15 minutes
     @Transactional
     public void autoSnapshotAllNamespaces() {
         logger.info("🤖 Starting automatic cost snapshot for all namespaces");
