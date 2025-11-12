@@ -40,18 +40,25 @@ public class CostAnalysisService {
     @Value("${cost.storage.gb.per.month:0.10}")
     private double storageCostPerMonth;
 
-    /**
- * Analyze costs for a specific namespace
+
+/**
+ * Analyze costs for a specific namespace (defaults to using cache)
  */
 public CostAnalysis analyzeNamespaceCost(String namespace) throws ApiException {
+    return analyzeNamespaceCost(namespace, false); // Default to using cache
+}
+
+/**
+ * Analyze costs for a specific namespace
+ */
+public CostAnalysis analyzeNamespaceCost(String namespace, boolean skipCache) throws ApiException {
+    logger.info("🔍 Analyzing costs for namespace: {} (skipCache={})", namespace, skipCache);
     
-    
-    logger.info(" Analyzing costs for namespace: {}", namespace);
-    if (cachingHelper != null) {
-        // Try to get from cache first
+    // Only check cache if NOT skipping
+    if (!skipCache && cachingHelper != null) {
         CostAnalysis cached = cachingHelper.getCachedCostAnalysis(namespace);
         if (cached != null) {
-            logger.info(" Retrieved cost analysis for {} from cache", namespace);
+            logger.info("⚡ Retrieved cost analysis for {} from cache", namespace);
             return cached;
         }
     }
@@ -378,13 +385,22 @@ private List<CostRecommendation> generateRecommendations(List<ResourceCost> cost
     /**
  * Get cluster-wide cost summary
  */
+/**
+ * Get cluster-wide cost summary (defaults to using cache)
+ */
 public ClusterCostSummary getClusterCostSummary() throws ApiException {
-    logger.info(" Calculating cluster-wide cost summary");
-    if (cachingHelper != null) {
-        // Try to get from cache first
+    return getClusterCostSummary(false); // Default to using cache
+}
+
+
+public ClusterCostSummary getClusterCostSummary(boolean skipCache) throws ApiException {
+    logger.info("🔍 Calculating cluster-wide cost summary (skipCache={})", skipCache);
+    
+    // Only check cache if NOT skipping
+    if (!skipCache && cachingHelper != null) {
         ClusterCostSummary cached = cachingHelper.getCachedClusterSummary();
         if (cached != null) {
-            logger.info(" Retrieved cluster cost summary from cache");
+            logger.info("⚡ Retrieved cluster cost summary from cache");
             return cached;
         }
     }
@@ -413,7 +429,7 @@ public ClusterCostSummary getClusterCostSummary() throws ApiException {
         if (namespace.startsWith("kube-")) continue;
 
         try {
-            CostAnalysis analysis = analyzeNamespaceCost(namespace);
+            CostAnalysis analysis = analyzeNamespaceCost(namespace, skipCache);
             double namespaceCost = analysis.getMonthlyCost();
             double namespaceEfficiency = analysis.getEfficiencyScore();
             
