@@ -72,14 +72,9 @@ public class CostController {
         try {
             long startTime = System.currentTimeMillis();
             logger.info("📊 Request: Cost analysis for namespace '{}'", namespace, refreshCache);
-            //refresh cache if requested
-            if (refreshCache && cachingHelper != null) {
-                logger.info(" Refreshing cache for namespace '{}'", namespace);
-                cachingHelper.invalidateNamespace(namespace);
-            }
-            //
+            
 
-            CostAnalysis analysis = costAnalysisService.analyzeNamespaceCost(namespace);
+            CostAnalysis analysis = costAnalysisService.analyzeNamespaceCost(namespace, refreshCache);
             long duration = System.currentTimeMillis() - startTime;
             
             return ResponseEntity.ok(Map.of(
@@ -122,15 +117,10 @@ public class CostController {
             long startTime = System.currentTimeMillis();
             logger.info("📊 Request: Cluster cost summary");
 
-            // Refresh cache if requested
-            if (refreshCache && cachingHelper != null) {
-                List<String> namespaces = costAnalysisService.getAllNamespaces();
-                for (String ns : namespaces) {
-                    cachingHelper.invalidateNamespace(ns);
-                }
-            }
+            
+           
 
-            ClusterCostSummary summary = costAnalysisService.getClusterCostSummary();
+            ClusterCostSummary summary = costAnalysisService.getClusterCostSummary(refreshCache);
             long duration = System.currentTimeMillis() - startTime;
             
             return ResponseEntity.ok(Map.of(
