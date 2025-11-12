@@ -10,8 +10,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  *  COST CACHING HELPER (with configurable TTLs)
@@ -182,17 +184,26 @@ public class CostCachingHelper {
      * Invalidate namespace cache
      */
     public void invalidateNamespace(String namespace) {
-        if (cacheService == null) return;
+    if (cacheService == null) return;
 
-        try {
-            String pattern = CACHE_PREFIX + "*:" + namespace + "*";
-            var keys = cacheService.getRedisTemplate().keys(pattern);
-            if (keys != null && !keys.isEmpty()) {
-                cacheService.getRedisTemplate().delete(keys);
-                logger.info("Invalidated {} cache keys for {}", keys.size(), namespace);
-            }
-        } catch (Exception e) {
-            logger.warn("Cache invalidation failed: {}", e.getMessage());
+    try {
+        // FIX: Match both patterns with and without trailing colon
+        String pattern1 = CACHE_PREFIX + "*:" + namespace;
+        String pattern2 = CACHE_PREFIX + "*:" + namespace + "*";
+        
+        var keys1 = cacheService.getRedisTemplate().keys(pattern1);
+        var keys2 = cacheService.getRedisTemplate().keys(pattern2);
+        
+        Set<String> allKeys = new HashSet<>();
+        if (keys1 != null) allKeys.addAll(keys1);
+        if (keys2 != null) allKeys.addAll(keys2);
+        
+        if (!allKeys.isEmpty()) {
+            cacheService.getRedisTemplate().delete(allKeys);
+            logger.info("Invalidated {} cache keys for {}", allKeys.size(), namespace);
         }
+    } catch (Exception e) {
+        logger.warn("Cache invalidation failed: {}", e.getMessage());
     }
+}
 }
