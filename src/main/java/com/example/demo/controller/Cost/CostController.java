@@ -19,7 +19,9 @@ import org.springframework.web.bind.annotation.*;
 import com.example.demo.service.Cost.CostPredictionService;
 import com.example.demo.service.Cost.CostSchedulerService;
 import com.example.demo.service.Cost.CostAnomalyDetector;
-
+//For caching
+import com.example.demo.service.Cost.CostCachingHelper;
+//for caching 
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -55,21 +57,41 @@ public class CostController {
     @Autowired
     private CostSchedulerService schedulerService;
 
+    //for caching 
+    @Autowired(required = false)
+    private CostCachingHelper cachingHelper;
+    //for caching 
+
     /**
      * Get cost analysis for a specific namespace
      */
+    // i'm updating this endpoint to use caching 
     @GetMapping("/analysis/{namespace}")
     public ResponseEntity<Map<String, Object>> getNamespaceCostAnalysis(
-            @PathVariable String namespace) {
+            @PathVariable String namespace,@RequestParam(required = false, defaultValue = "false") boolean refreshCache) {
         try {
-            logger.info("📊 Request: Cost analysis for namespace '{}'", namespace);
-            
+            long startTime = System.currentTimeMillis();
+            logger.info("📊 Request: Cost analysis for namespace '{}'", namespace, refreshCache);
+            //refresh cache if requested
+            if (refreshCache && cachingHelper != null) {
+                logger.info(" Refreshing cache for namespace '{}'", namespace);
+                cachingHelper.invalidateNamespace(namespace);
+            }
+            //
+
             CostAnalysis analysis = costAnalysisService.analyzeNamespaceCost(namespace);
+            long duration = System.currentTimeMillis() - startTime;
             
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "namespace", namespace,
-                "analysis", analysis
+                "analysis", analysis,
+                "cached", !refreshCache,
+                "responseTimeMs", duration,
+                "Timestamp", System.currentTimeMillis()
+
+
+
             ));
         } catch (ApiException e) {
             logger.error("API error fetching cost analysis for {}: {}", 
@@ -93,16 +115,30 @@ public class CostController {
     /**
      * Get cluster-wide cost summary
      */
+    // improving this endpoint to use caching
     @GetMapping("/summary")
-    public ResponseEntity<Map<String, Object>> getClusterCostSummary() {
+    public ResponseEntity<Map<String, Object>> getClusterCostSummary(@RequestParam (required = false, defaultValue = "false") boolean refreshCache) {
         try {
+            long startTime = System.currentTimeMillis();
             logger.info("📊 Request: Cluster cost summary");
-            
+
+            // Refresh cache if requested
+            if (refreshCache && cachingHelper != null) {
+                List<String> namespaces = costAnalysisService.getAllNamespaces();
+                for (String ns : namespaces) {
+                    cachingHelper.invalidateNamespace(ns);
+                }
+            }
+
             ClusterCostSummary summary = costAnalysisService.getClusterCostSummary();
+            long duration = System.currentTimeMillis() - startTime;
             
             return ResponseEntity.ok(Map.of(
                 "success", true,
-                "summary", summary
+                "summary", summary,
+                "cached", !refreshCache,
+                "responseTimeMs", duration,
+                "Timestamp", System.currentTimeMillis()
             ));
         } catch (Exception e) {
             logger.error("Error fetching cluster cost summary: {}", e.getMessage(), e);
@@ -164,11 +200,15 @@ public class CostController {
             "success", true,
             "status", "operational",
             "message", "Cost monitoring service is running",
+            "cachingEnabled", cachingHelper != null,
+            "timestamp", System.currentTimeMillis(),
             "features", Map.of(
                 "namespaceAnalysis", true,
                 "clusterSummary", true,
                 "recommendations", true,
-                "efficiencyScoring", true
+                "efficiencyScoring", true,
+                "caching", cachingHelper != null,
+                "forceRefresh", cachingHelper != null
             )
         ));
     }
@@ -569,4 +609,78 @@ private int calculateHealthScore(CostAnalysis analysis, CostForecast forecast,
     
     return Math.max(0, Math.min(100, score));
 }
+
+
+/**
+     * Manually invalidate cache for a specific namespace
+     * POST /api/cost/cache/invalidate/default
+     */
+    @PostMapping("/cache/invalidate/{namespace}")
+    public ResponseEntity<Map<String, Object>> invalidateCache(
+            @PathVariable String namespace) {
+        
+        if (cachingHelper == null) {
+            return ResponseEntity.ok(Map.of(
+                "success", false,
+                "message", "Caching is not enabled"
+            ));
+        }
+        
+        try {
+            cachingHelper.invalidateNamespace(namespace);
+            logger.info("🧹 Cache manually invalidated for namespace: {}", namespace);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Cache invalidated for namespace: " + namespace,
+                "timestamp", System.currentTimeMillis()
+            ));
+            
+        } catch (Exception e) {
+            logger.error("Error invalidating cache for {}: {}", namespace, e.getMessage());
+            return ResponseEntity.status(500).body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * Clear ALL caches (cluster-wide)
+     * POST /api/cost/cache/clear
+     */
+    @PostMapping("/cache/clear")
+    public ResponseEntity<Map<String, Object>> clearAllCaches() {
+        
+        if (cachingHelper == null) {
+            return ResponseEntity.ok(Map.of(
+                "success", false,
+                "message", "Caching is not enabled"
+            ));
+        }
+        
+        try {
+            // Invalidate all namespaces
+            List<String> namespaces = costAnalysisService.getAllNamespaces();
+            for (String ns : namespaces) {
+                cachingHelper.invalidateNamespace(ns);
+            }
+            
+            logger.info("🧹 All caches cleared - {} namespaces", namespaces.size());
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "All caches cleared",
+                "namespacesCleared", namespaces.size(),
+                "timestamp", System.currentTimeMillis()
+            ));
+            
+        } catch (Exception e) {
+            logger.error("Error clearing all caches: {}", e.getMessage());
+            return ResponseEntity.status(500).body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
 }
