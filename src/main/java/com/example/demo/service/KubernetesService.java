@@ -101,7 +101,19 @@ public class KubernetesService {
         throw e;
     }
 }
-
+    /**
+ * 🆕 Get fresh pods for cost analysis (bypasses cache)
+ */
+public List<PodInfo> getPodInfoClusterWideFresh() throws ApiException {
+    logger.debug("Fetching FRESH pod info (bypassing cache for cost analysis)");
+    
+    V1PodList podList = coreV1Api.listPodForAllNamespaces(
+        null, null, null, null, null, null, null, null, null, null);
+    
+    return podList.getItems().stream()
+        .map(this::convertV1PodToPodInfo)
+        .collect(Collectors.toList());
+}
 
     private PodInfo mapPodToPodInfo(V1Pod pod) {
         Map<String, V1Container> containerSpecs = pod.getSpec().getContainers().stream()

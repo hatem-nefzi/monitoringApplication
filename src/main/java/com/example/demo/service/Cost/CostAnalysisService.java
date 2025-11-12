@@ -57,7 +57,7 @@ public CostAnalysis analyzeNamespaceCost(String namespace) throws ApiException {
     }
     
 
-    List<PodInfo> pods = kubernetesService.getPodInfoClusterWide().stream()
+    List<PodInfo> pods = kubernetesService.getPodInfoClusterWideFresh().stream()
         .filter(pod -> pod.getNamespace().equals(namespace))
         .collect(Collectors.toList());
 
