@@ -27,8 +27,9 @@ public class CostAnalysisService {
     @Autowired
     
     private SmartRecommendationEngine smartRecommendationEngine;
-    //
-   
+
+    @Autowired(required = false)
+    private CostCachingHelper cachingHelper;
 
     @Value("${cost.cpu.per.hour:0.031}")
     private double cpuCostPerHour;
@@ -46,6 +47,14 @@ public CostAnalysis analyzeNamespaceCost(String namespace) throws ApiException {
     
     
     logger.info(" Analyzing costs for namespace: {}", namespace);
+    if (cachingHelper != null) {
+        // Try to get from cache first
+        CostAnalysis cached = cachingHelper.getCachedCostAnalysis(namespace);
+        if (cached != null) {
+            logger.info(" Retrieved cost analysis for {} from cache", namespace);
+            return cached;
+        }
+    }
     
 
     List<PodInfo> pods = kubernetesService.getPodInfoClusterWide().stream()
@@ -100,6 +109,9 @@ public CostAnalysis analyzeNamespaceCost(String namespace) throws ApiException {
         pods.size(), 
         String.format("%.0f", efficiencyScore),
         String.format("%.2f", totalSavings));
+    if (cachingHelper != null) {
+        cachingHelper.cacheCostAnalysis(namespace, analysis);
+    }
 
     return analysis;
 }
@@ -368,6 +380,14 @@ private List<CostRecommendation> generateRecommendations(List<ResourceCost> cost
  */
 public ClusterCostSummary getClusterCostSummary() throws ApiException {
     logger.info(" Calculating cluster-wide cost summary");
+    if (cachingHelper != null) {
+        // Try to get from cache first
+        ClusterCostSummary cached = cachingHelper.getCachedClusterSummary();
+        if (cached != null) {
+            logger.info(" Retrieved cluster cost summary from cache");
+            return cached;
+        }
+    }
 
     List<String> namespaces = kubernetesService.getNamespaces();
     Map<String, Double> costByNamespace = new HashMap<>();
@@ -456,6 +476,9 @@ public ClusterCostSummary getClusterCostSummary() throws ApiException {
     }
     if (totalWaste / totalCost > 0.7) {
         logger.warn(" Over 70% of resources are wasted - significant optimization opportunity!");
+    }
+    if (cachingHelper != null) {
+        cachingHelper.cacheClusterSummary(summary);
     }
 
     return summary;
