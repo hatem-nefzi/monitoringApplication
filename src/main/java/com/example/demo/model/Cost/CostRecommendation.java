@@ -18,6 +18,9 @@ public class CostRecommendation {
     private double potentialSavings;
     private String reason;
     private String priority;
+    // default constructor was causing the cache read failed oh my goooooooooooood!!!!!!!!!!!!!!!!!
+    public CostRecommendation() {
+    }
 
     // Constructor
     public CostRecommendation(String podName, String action, String currentValue, 
