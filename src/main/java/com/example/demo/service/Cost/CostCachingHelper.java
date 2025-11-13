@@ -63,9 +63,9 @@ public class CostCachingHelper {
                 .opsForValue()
                 .set(key, json, Duration.ofSeconds(costAnalysisTtlSeconds));
                 
-            logger.debug("✅ Cached cost analysis for {} (TTL: {}s)", namespace, costAnalysisTtlSeconds);
+            logger.info("✅ Cached cost analysis for {} (TTL: {}s)", namespace, costAnalysisTtlSeconds);
         } catch (Exception e) {
-            logger.debug("Cache write failed: {}", e.getMessage());
+            logger.info("Cache write failed: {}", e.getMessage());
         }
     }
 
@@ -85,11 +85,11 @@ public class CostCachingHelper {
 
             CostAnalysis analysis = objectMapper.readValue(
                 value.toString(), CostAnalysis.class);
-            logger.debug("✅ Cache HIT for {} (TTL: {}s)", namespace, costAnalysisTtlSeconds);
+            logger.info("✅ Cache HIT for {} (TTL: {}s)", namespace, costAnalysisTtlSeconds);
             return analysis;
             
         } catch (Exception e) {
-            logger.debug("Cache read failed: {}", e.getMessage());
+            logger.info("Cache read failed: {}", e.getMessage());
             return null;
         }
     }
@@ -108,9 +108,9 @@ public class CostCachingHelper {
                 .opsForValue()
                 .set(key, json, Duration.ofSeconds(clusterSummaryTtlSeconds));
                 
-            logger.debug("✅ Cached cluster summary (TTL: {}s)", clusterSummaryTtlSeconds);
+            logger.info("✅ Cached cluster summary (TTL: {}s)", clusterSummaryTtlSeconds);
         } catch (Exception e) {
-            logger.debug("Cache write failed: {}", e.getMessage());
+            logger.info("Cache write failed: {}", e.getMessage());
         }
     }
 
@@ -130,11 +130,11 @@ public class CostCachingHelper {
 
             ClusterCostSummary summary = objectMapper.readValue(
                 value.toString(), ClusterCostSummary.class);
-            logger.debug("✅ Cache HIT for cluster summary (TTL: {}s)", clusterSummaryTtlSeconds);
+            logger.info("✅ Cache HIT for cluster summary (TTL: {}s)", clusterSummaryTtlSeconds);
             return summary;
             
         } catch (Exception e) {
-            logger.debug("Cache read failed: {}", e.getMessage());
+            logger.info("Cache read failed: {}", e.getMessage());
             return null;
         }
     }
@@ -154,7 +154,7 @@ public class CostCachingHelper {
                 .set(key, json, Duration.ofSeconds(podMetricsTtlSeconds));
                 
         } catch (Exception e) {
-            logger.debug("Cache write failed: {}", e.getMessage());
+            logger.info("Cache write failed: {}", e.getMessage());
         }
     }
 
