@@ -65,6 +65,8 @@ public CostAnalysis analyzeNamespaceCost(String namespace, boolean skipCache) th
             return cached;
         }
     }
+
+    logger.info("🔄 Cache miss or skipCache=true - doing fresh calculation");
     
 
     List<PodInfo> pods = kubernetesService.getPodInfoClusterWideFresh().stream()
