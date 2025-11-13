@@ -116,7 +116,7 @@ public CostAnalysis analyzeNamespaceCost(String namespace, boolean skipCache) th
         pods.size(), 
         String.format("%.0f", efficiencyScore),
         String.format("%.2f", totalSavings));
-    if (cachingHelper != null) {
+    if (!skipCache && cachingHelper != null) {
         cachingHelper.cacheCostAnalysis(namespace, analysis);
     }
 
@@ -493,7 +493,7 @@ public ClusterCostSummary getClusterCostSummary(boolean skipCache) throws ApiExc
     if (totalWaste / totalCost > 0.7) {
         logger.warn(" Over 70% of resources are wasted - significant optimization opportunity!");
     }
-    if (cachingHelper != null) {
+    if (!skipCache && cachingHelper != null) {
         cachingHelper.cacheClusterSummary(summary);
     }
 
