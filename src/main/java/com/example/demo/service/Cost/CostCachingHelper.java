@@ -53,27 +53,37 @@ public class CostCachingHelper {
      * Cache cost analysis for a namespace
      */
     public void cacheCostAnalysis(String namespace, CostAnalysis analysis) {
-        if (cacheService == null) return;
+    if (cacheService == null) return;
 
-        try {
-            String key = CACHE_PREFIX + "analysis:" + namespace;
-            String json = objectMapper.writeValueAsString(analysis);
+    try {
+        String key = CACHE_PREFIX + "analysis:" + namespace;
+        String json = objectMapper.writeValueAsString(analysis);
+        
+        logger.info("💾 WRITING to cache: {} (TTL: {}s)", key, costAnalysisTtlSeconds);
+        
+        cacheService.getRedisTemplate()
+            .opsForValue()
+            .set(key, json, Duration.ofSeconds(costAnalysisTtlSeconds));
             
-            cacheService.getRedisTemplate()
-                .opsForValue()
-                .set(key, json, Duration.ofSeconds(costAnalysisTtlSeconds));
-                
-            logger.info("✅ Cached cost analysis for {} (TTL: {}s)", namespace, costAnalysisTtlSeconds);
-        } catch (Exception e) {
-            logger.info("Cache write failed: {}", e.getMessage());
-        }
+        logger.info("✅ Successfully cached analysis for {} (TTL: {}s)", namespace, costAnalysisTtlSeconds);
+        
+        // Verify it was written
+        Long ttl = cacheService.getRedisTemplate().getExpire(key);
+        logger.info("🔍 Verified TTL: {}s", ttl);
+        
+    } catch (Exception e) {
+        logger.error("❌ Cache write failed: {}", e.getMessage(), e);
     }
+}
 
     /**
      * Get cached cost analysis
      */
     public CostAnalysis getCachedCostAnalysis(String namespace) {
-        if (cacheService == null) return null;
+        if (cacheService == null) {
+        logger.info("❌ Cache service is NULL");
+        return null;
+    }
 
         try {
             String key = CACHE_PREFIX + "analysis:" + namespace;

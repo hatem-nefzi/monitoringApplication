@@ -354,9 +354,7 @@ public ResponseEntity<Map<String, Object>> getClusterCostHistory(
     }
 }
      
-// ============================================================
-// NEW ENDPOINTS - PASTE THESE INTO YOUR CostController CLASS
-// ============================================================
+
 
 /**
  * 📈 Get cost forecast for a namespace
@@ -400,7 +398,7 @@ public ResponseEntity<Map<String, Object>> getCostForecast(
 }
 
 /**
- * 📊 Get cost forecast for entire cluster
+ *  Get cost forecast for entire cluster
  */
 @GetMapping("/forecast/cluster")
 public ResponseEntity<Map<String, Object>> getClusterCostForecast(
@@ -450,7 +448,7 @@ public ResponseEntity<Map<String, Object>> getClusterCostForecast(
 }
 
 /**
- * ⚠️ Get cost anomalies for a namespace
+ * Get cost anomalies for a namespace
  */
 @GetMapping("/anomalies/{namespace}")
 public ResponseEntity<Map<String, Object>> getNamespaceAnomalies(
@@ -477,7 +475,7 @@ public ResponseEntity<Map<String, Object>> getNamespaceAnomalies(
 }
 
 /**
- * ⚠️ Get all cost anomalies cluster-wide
+ *  Get all cost anomalies cluster-wide
  */
 @GetMapping("/anomalies")
 public ResponseEntity<Map<String, Object>> getAllAnomalies() {
@@ -514,7 +512,7 @@ public ResponseEntity<Map<String, Object>> getAllAnomalies() {
 }
 
 /**
- * 🎬 DEMO: Simulate an anomaly for testing
+ *  DEMO: Simulate an anomaly for testing
  */
 @PostMapping("/anomalies/simulate")
 public ResponseEntity<Map<String, Object>> simulateAnomaly(
@@ -541,7 +539,7 @@ public ResponseEntity<Map<String, Object>> simulateAnomaly(
 }
 
 /**
- * 📊 Get comprehensive cost intelligence dashboard
+ *  Get comprehensive cost intelligence dashboard
  */
 @GetMapping("/intelligence/{namespace}")
 public ResponseEntity<Map<String, Object>> getCostIntelligence(
@@ -673,4 +671,6 @@ private int calculateHealthScore(CostAnalysis analysis, CostForecast forecast,
             ));
         }
     }
+
+    
 }

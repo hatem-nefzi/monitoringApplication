@@ -53,6 +53,9 @@ public CostAnalysis analyzeNamespaceCost(String namespace) throws ApiException {
  */
 public CostAnalysis analyzeNamespaceCost(String namespace, boolean skipCache) throws ApiException {
     logger.info("🔍 Analyzing costs for namespace: {} (skipCache={})", namespace, skipCache);
+    if (cachingHelper != null) {
+        logger.info("🔑 Cache key will be: cost:analysis:{}", namespace);
+    }
     
     // Only check cache if NOT skipping
     if (!skipCache && cachingHelper != null) {
@@ -116,7 +119,7 @@ public CostAnalysis analyzeNamespaceCost(String namespace, boolean skipCache) th
         pods.size(), 
         String.format("%.0f", efficiencyScore),
         String.format("%.2f", totalSavings));
-    if (!skipCache && cachingHelper != null) {
+    if ( cachingHelper != null) {
         cachingHelper.cacheCostAnalysis(namespace, analysis);
     }
 
@@ -396,6 +399,7 @@ public ClusterCostSummary getClusterCostSummary() throws ApiException {
 public ClusterCostSummary getClusterCostSummary(boolean skipCache) throws ApiException {
     logger.info("🔍 Calculating cluster-wide cost summary (skipCache={})", skipCache);
     
+    
     // Only check cache if NOT skipping
     if (!skipCache && cachingHelper != null) {
         ClusterCostSummary cached = cachingHelper.getCachedClusterSummary();
@@ -493,7 +497,7 @@ public ClusterCostSummary getClusterCostSummary(boolean skipCache) throws ApiExc
     if (totalWaste / totalCost > 0.7) {
         logger.warn(" Over 70% of resources are wasted - significant optimization opportunity!");
     }
-    if (!skipCache && cachingHelper != null) {
+    if ( cachingHelper != null) {
         cachingHelper.cacheClusterSummary(summary);
     }
 
