@@ -255,7 +255,7 @@ private List<CostRecommendation> generateRecommendations(List<ResourceCost> cost
             continue;
         }
 
-        // ===== TRY SMART RECOMMENDATIONS FIRST (using history) =====
+        // TRY SMART RECOMMENDATIONS FIRST (using history) 
         try {
             List<CostRecommendation> smartRecs = smartRecommendationEngine
                 .generateSmartRecommendations(namespace, cost.getPodName());

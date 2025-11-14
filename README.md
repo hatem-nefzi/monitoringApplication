@@ -21,7 +21,8 @@
   </tr>
   <tr>
     <td><img src="images/cost-optimization.png" alt="Cost Analysis"/><br/><b>Cost Optimization Insights</b></td>
-    <td><img src="[PATH_TO_PIPELINE_SCREENSHOT]" alt="CI/CD Pipeline"/><br/><b>GitLab CI/CD Pipeline</b></td>
+    <td><img src="[images/ci-cd-1.png]" alt="CI/CD Pipeline part 1"/><br/><b>GitLab CI/CD Pipeline</b></td>
+    <td><img src="[images/ci-cd-2.png]" alt="CI/CD Pipeline part 1"/><br/><b>GitLab CI/CD Pipeline</b></td>
   </tr>
 </table>
 
@@ -94,8 +95,7 @@ Unlike typical  projects, this implements enterprise patterns:
 
 - **Dual-Cluster Setup**: Staging (K3d local) → Production (Homelab K3s)
 - **SSH-Based GitOps**: Secure remote deployment without exposing clusters
-- **Physical Hardware**: Real homelab with [8YOUR_HARDWARE_SPECS]
-- **Network Isolation**: [YOUR_NETWORK_SETUP]
+- **Physical Hardware**: Real homelab with 1 machine 16Gb RAM 8vCPU (production)and another machine 8Gb RAM 4vCPu (staging)
 
 ### 2. 🔧 **Sophisticated CI/CD Architecture**
 
@@ -123,8 +123,8 @@ ci-templates/
 
 - **Backend**: Spring Boot with reactive patterns, caching, observability
 - **Frontend**: Angular with many UI libraries for real-time dashboards
-- **Infrastructure**: Kustomize-based K8s manifests (not Helm charts)
-- **Automation**: GitLab CI/CD with sub 15 minutes deployment time
+- **Infrastructure**: Kustomize-based K8s manifests 
+- **Automation**: GitLab CI/CD with sub 15 minutes deployment time as shown in the pictures above
 
 ### 4. 🤖 **Intelligent Auto-Remediation**
 
@@ -169,7 +169,7 @@ Not just "restart pods" - actual intelligent decision-making:
 ```
 
 **Capabilities:**
-- [YOUR_REMEDIATION_FEATURES]
+
 - [DETECTION_THRESHOLDS]
 - [BACKOFF_STRATEGY]
 - [MAX_RETRY_LOGIC]
@@ -179,14 +179,14 @@ Not just "restart pods" - actual intelligent decision-making:
 Real-time cost analysis with actionable recommendations:
 
 - **Cluster Cost Breakdown**: By namespace, deployment, pod
-- **Resource Efficiency Score**: Identify over/under-provisioned workloads
+- **Resource Efficiency Score**: Identify over/under-provisioned and efficient workloads
 - **Waste Detection**: Idle pods, zombie resources
 - **Savings Recommendations**: [YOUR_OPTIMIZATION_ALGORITHM]
 - **Historical Trends**: Track cost over time
 
 **Cost Calculation Model:**
 ```
-[YOUR_COST_FORMULA_IF_YOU_WANT_TO_SHARE]
+
 ```
 
 ### 🎨 **Angular Frontend Dashboard**
@@ -299,10 +299,10 @@ Real-time cost analysis with actionable recommendations:
 
 ### Data Flow
 
-1. **Monitoring Loop**: [YOUR_MONITORING_FLOW]
-2. **Remediation Trigger**: [YOUR_REMEDIATION_FLOW]
-3. **Cost Analysis**: [YOUR_COST_ANALYSIS_FLOW]
-4. **Frontend Updates**: [YOUR_REAL_TIME_UPDATE_MECHANISM]
+1. **Monitoring Loop**: 
+2. **Remediation Trigger**: 
+3. **Cost Analysis**: 
+4. **Frontend Updates**:
 
 ---
 
@@ -337,10 +337,10 @@ monitoringApplication/
 │   │   │   │   ├── dashboard/
 │   │   │   │   ├── auto-remediation/
 │   │   │   │   ├── cost-optimization/
-│   │   │   │   └── [YOUR_COMPONENTS]
+│   │   │   │   └── [other-components]
 │   │   │   ├── services/             # API Services
 │   │   │   ├── models/               # TypeScript Models
-│   │   │   └── [YOUR_FRONTEND_STRUCTURE]
+│   │   │   └── []
 │   │   ├── assets/
 │   │   └── environments/
 │   ├── angular.json
