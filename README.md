@@ -21,8 +21,8 @@
   </tr>
   <tr>
     <td><img src="images/cost-optimization.png" alt="Cost Analysis"/><br/><b>Cost Optimization Insights</b></td>
-    <td><img src="[images/ci-cd-1.png]" alt="CI/CD Pipeline part 1"/><br/><b>GitLab CI/CD Pipeline</b></td>
-    <td><img src="[images/ci-cd-2.png]" alt="CI/CD Pipeline part 1"/><br/><b>GitLab CI/CD Pipeline</b></td>
+    <td><img src="images/ci-cd-1.png" alt="CI/CD Pipeline part 1"/><br/><b>GitLab CI/CD Pipeline</b></td>
+    <td><img src="images/ci-cd-2.png" alt="CI/CD Pipeline part 1"/><br/><b>GitLab CI/CD Pipeline</b></td>
   </tr>
 </table>
 
