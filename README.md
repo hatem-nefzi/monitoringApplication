@@ -113,25 +113,30 @@ A self-validating platform that deploys itself and proves its robustness:
 **Unique Innovation:** The platform deploys a monitoring application that validates the platform itself.
 
 ```
-### Complete System Architecture (Original + Extensions)
-```
+                              COMPLETE SYSTEM ARCHITECTURE
+--------------------------------------------------------------------------------
+
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                       GitLab CI/CD Platform (Original)                       │
 │  Pipeline-as-a-Platform Templates → Security Gates → Multi-Env Deployment   │
 │              ↓ deploys to                    ↓ deploys to                   │
 │     GKE Production (Original)          Homelab K3s (Extended)                │
 └─────────────────────────────────────────────────────────────────────────────┘
+
                               │                          │
                               ├──────────────────────────┤
                               ↓                          ↓
+
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    Self-Validating Monitoring Application                    │
 │  • Original: Cross-namespace visibility, RBAC, TLS automation                │
 │  • Extended: Auto-remediation triggers, ML cost analysis API                 │
 └─────────────────────────────────────────────────────────────────────────────┘
+
                               │
                 ┌─────────────┴─────────────┐
                 ↓                           ↓
+
 ┌──────────────────────────┐    ┌──────────────────────────┐
 │  Auto-Remediation Engine │    │  ML FinOps Engine        │
 │  (Extended Feature)      │    │  (Extended Feature)      │
@@ -151,13 +156,16 @@ A self-validating platform that deploys itself and proves its robustness:
 │  │ • Health validation│  │    │  │ • Cost impact      │  │
 │  └────────────────────┘  │    │  └────────────────────┘  │
 └──────────────────────────┘    └──────────────────────────┘
+
             ↓                               ↓
+
 ┌─────────────────────────────────────────────────────────────┐
 │           Prometheus + Grafana + Alertmanager               │
 │  • Original monitoring stack                                │
 │  • Extended with remediation metrics                        │
 │  • ML cost optimization dashboards                          │
 └─────────────────────────────────────────────────────────────┘
+
 ```
 ```
 
