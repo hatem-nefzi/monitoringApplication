@@ -1,5 +1,5 @@
 # 🚀 DevOps Unified Platform
-### Enterprise-Grade Self-Validating CI/CD Platform with Kubernetes Monitoring & Auto-Remediation
+### Enterprise-Grade Self-Validating CI/CD Platform with Kubernetes Monitoring & Auto-Remediation &  ML-Driven Cost-Optimization (FinOps)
 
 [![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.0-brightgreen.svg)](https://spring.io/projects/spring-boot)
@@ -8,9 +8,11 @@
 [![GitLab CI](https://img.shields.io/badge/GitLab%20CI-Modular-orange.svg)](https://docs.gitlab.com/ee/ci/)
 [![License](https://img.shields.io/badge/License-Academic-blue.svg)](LICENSE)
 
-> A production-ready **Pipeline-as-a-Platform (PaaP)** solution featuring self-validating architecture, zero-configuration monitoring, intelligent auto-remediation, and sophisticated hybrid infrastructure deployment (on-premise + GKE).
+A production-ready **Pipeline-as-a-Platform (PaaP)** solution featuring self-validating architecture, **ML-driven cost optimization**, **intelligent auto-remediation**, and hybrid infrastructure deployment (on-premise + GCP/GKE + homelab).
 
-**🎯 Thesis Project:** This platform demonstrates the feasibility of implementing a complete DevSecOps solution in an academic context while integrating industrial best practices.
+**🔥 Production Platform with Real-World Extensions** | Originally built as final-year engineering project with hybrid cloud deployment, now evolved with ML-driven automation and self-healing capabilities running on dedicated homelab infrastructure.
+
+**🎯 Engineering Project → Production Platform:** Demonstrates complete DevOps/Platform Engineering capabilities from initial hybrid cloud architecture to advanced ML-powered automation.
 
 ---
 
@@ -29,16 +31,14 @@
 </table>
 
 
-## 🎥 Live Demo
-
-**🌐 Production Application:** [https://monitoring-dashboard.duckdns.org](https://monitoring-dashboard.duckdns.org)
+**🌐 Original Production (GCP/GKE):** [https://monitoring-dashboard.duckdns.org](https://monitoring-dashboard.duckdns.org)
 
 **📊 Monitoring Stack:**
 - Prometheus: [https://prometheus-backend.duckdns.org](https://prometheus-backend.duckdns.org)
 - Grafana: [https://grafana-backend.duckdns.org](https://grafana-backend.duckdns.org)
 - Alertmanager: [https://alertmanager-backend.duckdns.org](https://alertmanager-backend.duckdns.org)
 
----
+**🏠 Homelab Environment:** 2 K3d clusters (one for staging and another for production) with auto-remediation + ML FinOps (internal network)
 
 ## 📋 Table of Contents
 
@@ -113,25 +113,52 @@ A self-validating platform that deploys itself and proves its robustness:
 **Unique Innovation:** The platform deploys a monitoring application that validates the platform itself.
 
 ```
-┌──────────────────────────────────────────────────────┐
-│              DevOps Platform                         │
-│  ┌────────────────────────────────────────────┐     │
-│  │   GitLab CI/CD Pipeline                    │     │
-│  │   (Templates + Security + Deployment)      │     │
-│  └────────────────────────────────────────────┘     │
-│                    ↓ deploys                         │
-│  ┌────────────────────────────────────────────┐     │
-│  │   Monitoring Application                   │     │
-│  │   (Spring Boot + Angular)                  │     │
-│  └────────────────────────────────────────────┘     │
-│                    ↓ validates                       │
-│  ┌────────────────────────────────────────────┐     │
-│  │   Platform Health Proof                    │     │
-│  │   • Cross-namespace visibility             │     │
-│  │   • RBAC security validation               │     │
-│  │   • TLS certificate automation             │     │
-│  └────────────────────────────────────────────┘     │
-└──────────────────────────────────────────────────────┘
+### Complete System Architecture (Original + Extensions)
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       GitLab CI/CD Platform (Original)                       │
+│  Pipeline-as-a-Platform Templates → Security Gates → Multi-Env Deployment   │
+│              ↓ deploys to                    ↓ deploys to                   │
+│     GKE Production (Original)          Homelab K3s (Extended)                │
+└─────────────────────────────────────────────────────────────────────────────┘
+                              │                          │
+                              ├──────────────────────────┤
+                              ↓                          ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    Self-Validating Monitoring Application                    │
+│  • Original: Cross-namespace visibility, RBAC, TLS automation                │
+│  • Extended: Auto-remediation triggers, ML cost analysis API                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+                              │
+                ┌─────────────┴─────────────┐
+                ↓                           ↓
+┌──────────────────────────┐    ┌──────────────────────────┐
+│  Auto-Remediation Engine │    │  ML FinOps Engine        │
+│  (Extended Feature)      │    │  (Extended Feature)      │
+│  ┌────────────────────┐  │    │  ┌────────────────────┐  │
+│  │ Failure Detection  │  │    │  │ Data Collection    │  │
+│  │ • 7 failure states │  │    │  │ • 15min snapshots  │  │
+│  │ • Alert webhooks   │  │    │  │ • 30-day history   │  │
+│  └────────────────────┘  │    │  └────────────────────┘  │
+│  ┌────────────────────┐  │    │  ┌────────────────────┐  │
+│  │ Exponential Backoff│  │    │  │ ML Analysis        │  │
+│  │ • 2→5→10→20→60min  │  │    │  │ • Prophet model    │  │
+│  │ • Prevent flapping │  │    │  │ • P95/P99 analysis │  │
+│  └────────────────────┘  │    │  └────────────────────┘  │
+│  ┌────────────────────┐  │    │  ┌────────────────────┐  │
+│  │ Remediation Actions│  │    │  │ Recommendations    │  │
+│  │ • kubectl commands │  │    │  │ • Confidence score │  │
+│  │ • Health validation│  │    │  │ • Cost impact      │  │
+│  └────────────────────┘  │    │  └────────────────────┘  │
+└──────────────────────────┘    └──────────────────────────┘
+            ↓                               ↓
+┌─────────────────────────────────────────────────────────────┐
+│           Prometheus + Grafana + Alertmanager               │
+│  • Original monitoring stack                                │
+│  • Extended with remediation metrics                        │
+│  • ML cost optimization dashboards                          │
+└─────────────────────────────────────────────────────────────┘
+```
 ```
 
 ### 2. 🏗️ **Hybrid Multi-Environment Infrastructure**
