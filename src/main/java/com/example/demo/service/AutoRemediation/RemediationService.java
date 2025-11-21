@@ -586,7 +586,7 @@ private void handleCreateContainerConfigError(PodInfo pod, RemediationPolicy cur
     // ==================== PUBLIC API ====================
 
     /**
-     * ✅ FIXED: Thread-safe list retrieval
+     *  FIXED: Thread-safe list retrieval
      * - Synchronized block prevents race conditions during iteration
      * - Creates defensive copy (subList + ArrayList)
      */
