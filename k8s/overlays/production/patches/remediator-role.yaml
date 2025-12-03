@@ -1,8 +1,9 @@
+# k8s/overlays/production/patches/remediator-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: monitoring-backend-remediator
-  namespace: staging
+  namespace: production  # ← Same namespace as your app
 rules:
 - apiGroups: [""]
   resources: ["pods"]
@@ -12,11 +13,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: monitoring-backend-remediator-binding
-  namespace: staging
+  namespace: production  # ← Same namespace
 subjects:
 - kind: ServiceAccount
-  name: monitoring-backend
-  namespace: staging
+  name: monitoring-backend  # ← Matches your deployment
+  namespace: production
 roleRef:
   kind: Role
   name: monitoring-backend-remediator

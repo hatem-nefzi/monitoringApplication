@@ -8,6 +8,7 @@ resources:
 - ../../monitoring
 - ingress.yaml
 - postgres.yaml
+- patches/remediator-role.yaml
   
 
 
