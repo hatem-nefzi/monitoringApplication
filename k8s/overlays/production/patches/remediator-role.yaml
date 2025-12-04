@@ -16,7 +16,7 @@ metadata:
   namespace: production  # ← Same namespace
 subjects:
 - kind: ServiceAccount
-  name: monitoring-backend  # ← Matches your deployment
+  name: monitoring-backend  # ← Matches your deployment.
   namespace: production
 roleRef:
   kind: Role
