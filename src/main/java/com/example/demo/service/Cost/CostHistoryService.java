@@ -8,6 +8,11 @@ import com.example.demo.repository.CostSnapshotRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+// for pagination 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +34,21 @@ public class CostHistoryService {
     
     @Autowired
     private CostSnapshotRepository snapshotRepository;
+
+    /**
+     * Get PAGINATED cost history for a namespace
+     */
+    public Page<CostSnapshot> getCostHistoryPaginated(String namespace, int page, int size, int days) {
+        LocalDateTime since = LocalDateTime.now().minusDays(days);
+        
+        // Create pageable with sorting (newest first)
+        Pageable pageable = PageRequest.of(page, size, Sort.by("timestamp").descending());
+        
+        logger.info("📊 Fetching page {} (size {}) of cost history for namespace: {}", 
+            page, size, namespace);
+        
+        return snapshotRepository.findByNamespaceAndTimestampAfter(namespace, since, pageable);
+    }
     
     /**
      * Get cost history for a namespace (last N days)

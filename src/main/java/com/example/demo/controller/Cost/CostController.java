@@ -13,6 +13,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 //for the ml cost prediction endpoints
@@ -220,7 +221,57 @@ public class CostController {
             )
         ));
     }
-    // Add these endpoints to your existing CostController.java
+    // 
+
+
+
+/**
+ * Get PAGINATED cost history for a namespace
+ * GET /api/cost/history/{namespace}/paginated?page=0&size=20&days=30
+ */ 
+@GetMapping("/history/{namespace}/paginated")
+public ResponseEntity<Map<String, Object>> getCostHistoryPaginated(
+        @PathVariable String namespace,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size,
+        @RequestParam(defaultValue = "30") int days) {
+    try {
+        logger.info("📈 Request: Paginated cost history for '{}' - page {}, size {}, days {}", 
+            namespace, page, size, days);
+        
+        // Validate parameters
+        if (page < 0) page = 0;
+        if (size < 1) size = 20;
+        if (size > 100) size = 100; // Max 100 per page
+        
+        Page<CostSnapshot> historyPage = costHistoryService.getCostHistoryPaginated(
+            namespace, page, size, days);
+        
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "namespace", namespace,
+            "days", days,
+            "data", historyPage.getContent(),
+            "pagination", Map.of(
+                "currentPage", historyPage.getNumber(),
+                "totalPages", historyPage.getTotalPages(),
+                "totalElements", historyPage.getTotalElements(),
+                "pageSize", historyPage.getSize(),
+                "hasNext", historyPage.hasNext(),
+                "hasPrevious", historyPage.hasPrevious(),
+                "isFirst", historyPage.isFirst(),
+                "isLast", historyPage.isLast()
+            )
+        ));
+    } catch (Exception e) {
+        logger.error("Error fetching paginated history for {}: {}", namespace, e.getMessage(), e);
+        return ResponseEntity.status(500)
+            .body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+    }
+}
 
 /**
  * Get cost history for a namespace
