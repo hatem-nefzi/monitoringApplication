@@ -158,6 +158,22 @@
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
     </dependency>
+    
+    <!-- Add ShedLock dependencies -->
+    <!-- ShedLock Core -->
+    <dependency>
+        <groupId>net.javacrumbs.shedlock</groupId>
+        <artifactId>shedlock-spring</artifactId>
+        <version>5.16.0</version>
+    </dependency>
+    
+    <!-- ShedLock JDBC Provider (for PostgreSQL) -->
+    <dependency>
+        <groupId>net.javacrumbs.shedlock</groupId>
+        <artifactId>shedlock-provider-jdbc-template</artifactId>
+        <version>5.16.0</version>
+    </dependency>
+
        
     </dependencies>
 

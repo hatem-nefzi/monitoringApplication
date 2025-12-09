@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-shedlock-table
+  namespace: production
+spec:
+  template:
+    spec:
+      containers:
+        - name: postgres-client
+          image: postgres:16-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Creating ShedLock table..."
+              PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB << 'EOF'
+              CREATE TABLE IF NOT EXISTS shedlock (
+                  name VARCHAR(64) NOT NULL,
+                  lock_until TIMESTAMP NOT NULL,
+                  locked_at TIMESTAMP NOT NULL,
+                  locked_by VARCHAR(255) NOT NULL,
+                  PRIMARY KEY (name)
+              );
+              CREATE INDEX IF NOT EXISTS idx_shedlock_lock_until ON shedlock(lock_until);
+              
+              -- Verify table was created
+              \dt shedlock
+              
+              SELECT 'ShedLock table created successfully!' AS status;
+              EOF
+              echo "Migration completed!"
+          env:
+            - name: POSTGRES_HOST
+              value: "postgres-service.production.svc.cluster.local"
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+      restartPolicy: Never
+  backoffLimit: 2

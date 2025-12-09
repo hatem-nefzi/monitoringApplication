@@ -37,5 +37,8 @@ deploy:staging:
       EOF
     - kubectl cluster-info
   script:
+    # ADD THIS: One-time migration (idempotent - safe to run multiple times)
+    - kubectl apply -f k8s/overlays/production/create-shedlock-table-job.yaml || true
+    - kubectl wait --for=condition=complete --timeout=60s job/create-shedlock-table -n ${TARGET_NAMESPACE} || true
     - !reference [.k8s_prepare_script, script]
     - !reference [.k8s_apply_overlay_script, script]
