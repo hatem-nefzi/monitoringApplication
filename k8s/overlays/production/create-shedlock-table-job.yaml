@@ -9,6 +9,7 @@ spec:
       containers:
         - name: postgres-client
           image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
           command:
             - /bin/sh
             - -c
